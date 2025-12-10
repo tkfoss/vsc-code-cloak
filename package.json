@@ -1,0 +1,466 @@
+{
+  "name": "vsc-code-cloak",
+  "displayName": "VSC Code Cloak",
+  "description": "Universal code privacy extension - hide secrets, types, comments, docstrings and more during screen sharing",
+  "version": "1.0.0",
+  "publisher": "vsc-code-cloak",
+  "author": {
+    "name": "VSC Code Cloak",
+    "email": "hello@vsc-code-cloak.dev"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vsc-code-cloak/vsc-code-cloak.git"
+  },
+  "license": "MIT",
+  "icon": "assets/icon.png",
+  "engines": {
+    "vscode": "^1.96.0",
+    "node": ">=18.0.0"
+  },
+  "categories": [
+    "Other",
+    "Formatters",
+    "Visualization"
+  ],
+  "keywords": [
+    "privacy",
+    "secrets",
+    "hide",
+    "cloak",
+    "env",
+    "environment",
+    "dotenv",
+    "security",
+    "screen sharing",
+    "streaming",
+    "recording",
+    "json",
+    "yaml",
+    "toml",
+    "properties",
+    "typescript",
+    "docstrings",
+    "comments",
+    "types"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codeCloak.enable",
+        "title": "Code Cloak: Enable",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "codeCloak.disable",
+        "title": "Code Cloak: Disable",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "codeCloak.toggle",
+        "title": "Code Cloak: Toggle",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "codeCloak.hideSecrets",
+        "title": "Code Cloak: Hide Secrets",
+        "icon": "$(lock)"
+      },
+      {
+        "command": "codeCloak.showSecrets",
+        "title": "Code Cloak: Show Secrets",
+        "icon": "$(unlock)"
+      },
+      {
+        "command": "codeCloak.hideTypes",
+        "title": "Code Cloak: Hide Type Annotations",
+        "icon": "$(symbol-type-parameter)"
+      },
+      {
+        "command": "codeCloak.showTypes",
+        "title": "Code Cloak: Show Type Annotations",
+        "icon": "$(symbol-type-parameter)"
+      },
+      {
+        "command": "codeCloak.hideComments",
+        "title": "Code Cloak: Hide Comments",
+        "icon": "$(comment)"
+      },
+      {
+        "command": "codeCloak.showComments",
+        "title": "Code Cloak: Show Comments",
+        "icon": "$(comment)"
+      },
+      {
+        "command": "codeCloak.hideDocstrings",
+        "title": "Code Cloak: Hide Docstrings",
+        "icon": "$(book)"
+      },
+      {
+        "command": "codeCloak.showDocstrings",
+        "title": "Code Cloak: Show Docstrings",
+        "icon": "$(book)"
+      },
+      {
+        "command": "codeCloak.toggleCurrentLine",
+        "title": "Code Cloak: Toggle Current Line",
+        "icon": "$(selection)"
+      },
+      {
+        "command": "codeCloak.addToExcludeList",
+        "title": "Code Cloak: Add to Exclude List",
+        "icon": "$(add)"
+      },
+      {
+        "command": "codeCloak.excludeFile",
+        "title": "Code Cloak: Exclude This File",
+        "icon": "$(exclude)"
+      },
+      {
+        "command": "codeCloak.includeFile",
+        "title": "Code Cloak: Include This File",
+        "icon": "$(add)"
+      },
+      {
+        "command": "codeCloak.changeStyle",
+        "title": "Code Cloak: Change Hiding Style",
+        "icon": "$(paintcan)"
+      }
+    ],
+    "configuration": {
+      "title": "Code Cloak",
+      "properties": {
+        "codeCloak.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable Code Cloak extension"
+        },
+        "codeCloak.autoHide": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically hide configured items when opening files"
+        },
+        "codeCloak.features.secrets": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable hiding of secrets in configuration files"
+        },
+        "codeCloak.features.types": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable hiding of type annotations in TypeScript/Python"
+        },
+        "codeCloak.features.comments": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable hiding of comments"
+        },
+        "codeCloak.features.docstrings": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable hiding of docstrings in Python"
+        },
+        "codeCloak.secrets.filePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            ".env*",
+            "*.env",
+            ".envrc",
+            "*.json",
+            "*.yaml",
+            "*.yml",
+            "*.properties",
+            "*.ini",
+            "*.conf",
+            "*.toml",
+            "*.sh"
+          ],
+          "description": "File patterns for secret detection"
+        },
+        "codeCloak.secrets.keyPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "*KEY*",
+            "*TOKEN*",
+            "*SECRET*",
+            "*PASSWORD*",
+            "*PWD*",
+            "*PASS*",
+            "*API*",
+            "*DB*",
+            "*DATABASE*",
+            "*CONNECTION*",
+            "*CREDENTIAL*",
+            "*AUTH*",
+            "*PRIVATE*",
+            "*CERT*"
+          ],
+          "description": "Patterns to match keys that should be hidden (supports wildcards)"
+        },
+        "codeCloak.secrets.excludeKeys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "PUBLIC*",
+            "*_TEST",
+            "DEBUG",
+            "NODE_ENV",
+            "ENVIRONMENT"
+          ],
+          "description": "Keys that should never be hidden"
+        },
+        "codeCloak.appearance.style": {
+          "type": "string",
+          "enum": [
+            "text",
+            "dots",
+            "stars",
+            "scramble",
+            "blur",
+            "block"
+          ],
+          "default": "text",
+          "description": "Style of hidden content"
+        },
+        "codeCloak.appearance.hiddenText": {
+          "type": "string",
+          "default": "***HIDDEN***",
+          "description": "Text to display for hidden content"
+        },
+        "codeCloak.appearance.textColor": {
+          "type": "string",
+          "default": "auto",
+          "description": "Color of hidden text (auto, transparent, or CSS color)"
+        },
+        "codeCloak.appearance.backgroundColor": {
+          "type": "string",
+          "default": "auto",
+          "description": "Background color for hidden content (auto, transparent, or CSS color)"
+        },
+        "codeCloak.appearance.opacity": {
+          "type": "number",
+          "default": 0.3,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Opacity for blur style (0-1)"
+        },
+        "codeCloak.types.languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "typescript",
+            "typescriptreact",
+            "python"
+          ],
+          "description": "Languages for type annotation hiding"
+        },
+        "codeCloak.comments.hideLineComments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Hide single-line comments"
+        },
+        "codeCloak.comments.hideBlockComments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Hide multi-line block comments"
+        },
+        "codeCloak.docstrings.languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "python",
+            "jupyter"
+          ],
+          "description": "Languages for docstring hiding"
+        },
+        "codeCloak.files.excluded": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "File paths to exclude from Code Cloak"
+        },
+        "codeCloak.hover.showPreview": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show preview of hidden content on hover"
+        },
+        "codeCloak.hover.message": {
+          "type": "string",
+          "default": "Content hidden by Code Cloak",
+          "description": "Message to show when hovering over hidden content"
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "codeCloak.toggle",
+        "key": "ctrl+shift+alt+h",
+        "mac": "cmd+shift+alt+h"
+      },
+      {
+        "command": "codeCloak.hideSecrets",
+        "key": "ctrl+shift+alt+s",
+        "mac": "cmd+shift+alt+s",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "codeCloak.hideTypes",
+        "key": "ctrl+shift+alt+t",
+        "mac": "cmd+shift+alt+t",
+        "when": "editorTextFocus && (editorLangId == typescript || editorLangId == typescriptreact || editorLangId == python)"
+      },
+      {
+        "command": "codeCloak.hideComments",
+        "key": "ctrl+shift+alt+c",
+        "mac": "cmd+shift+alt+c",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "codeCloak.hideDocstrings",
+        "key": "ctrl+shift+alt+d",
+        "mac": "cmd+shift+alt+d",
+        "when": "editorTextFocus && (editorLangId == python || editorLangId == jupyter)"
+      },
+      {
+        "command": "codeCloak.toggleCurrentLine",
+        "key": "ctrl+shift+alt+l",
+        "mac": "cmd+shift+alt+l",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "submenu": "codeCloak.mainMenu",
+          "group": "codeCloak@1"
+        }
+      ],
+      "codeCloak.mainMenu": [
+        {
+          "command": "codeCloak.enable",
+          "when": "!config.codeCloak.enabled",
+          "group": "1_toggle@1"
+        },
+        {
+          "command": "codeCloak.disable",
+          "when": "config.codeCloak.enabled",
+          "group": "1_toggle@1"
+        },
+        {
+          "command": "codeCloak.hideSecrets",
+          "when": "config.codeCloak.enabled && config.codeCloak.features.secrets",
+          "group": "2_features@1"
+        },
+        {
+          "command": "codeCloak.showSecrets",
+          "when": "config.codeCloak.enabled && config.codeCloak.features.secrets",
+          "group": "2_features@1"
+        },
+        {
+          "command": "codeCloak.hideTypes",
+          "when": "config.codeCloak.enabled && config.codeCloak.features.types",
+          "group": "2_features@2"
+        },
+        {
+          "command": "codeCloak.showTypes",
+          "when": "config.codeCloak.enabled && config.codeCloak.features.types",
+          "group": "2_features@2"
+        },
+        {
+          "command": "codeCloak.hideComments",
+          "when": "config.codeCloak.enabled && config.codeCloak.features.comments",
+          "group": "2_features@3"
+        },
+        {
+          "command": "codeCloak.showComments",
+          "when": "config.codeCloak.enabled && config.codeCloak.features.comments",
+          "group": "2_features@3"
+        },
+        {
+          "command": "codeCloak.hideDocstrings",
+          "when": "config.codeCloak.enabled && config.codeCloak.features.docstrings",
+          "group": "2_features@4"
+        },
+        {
+          "command": "codeCloak.showDocstrings",
+          "when": "config.codeCloak.enabled && config.codeCloak.features.docstrings",
+          "group": "2_features@4"
+        },
+        {
+          "command": "codeCloak.toggleCurrentLine",
+          "when": "config.codeCloak.enabled",
+          "group": "3_selection@1"
+        },
+        {
+          "command": "codeCloak.addToExcludeList",
+          "when": "config.codeCloak.enabled",
+          "group": "3_selection@2"
+        },
+        {
+          "command": "codeCloak.excludeFile",
+          "when": "config.codeCloak.enabled",
+          "group": "4_file@1"
+        },
+        {
+          "command": "codeCloak.includeFile",
+          "when": "config.codeCloak.enabled",
+          "group": "4_file@2"
+        },
+        {
+          "command": "codeCloak.changeStyle",
+          "when": "config.codeCloak.enabled",
+          "group": "5_style@1"
+        }
+      ]
+    },
+    "submenus": [
+      {
+        "id": "codeCloak.mainMenu",
+        "label": "Code Cloak",
+        "icon": "$(eye-closed)"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.96.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vscode/vsce": "^2.24.0",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.2.5",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.4.0"
+  }
+}
