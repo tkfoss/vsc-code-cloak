@@ -20,13 +20,6 @@ export class StatusBarManager {
     const commentsHidden = this.configManager.isCommentsHidden();
     const docstringsHidden = this.configManager.isDocstringsHidden();
 
-    if (!enabled) {
-      this.statusBarItem.text = '$(eye) Code Cloak: Off';
-      this.statusBarItem.tooltip = 'Click to enable Code Cloak';
-      this.statusBarItem.backgroundColor = undefined;
-      return;
-    }
-
     const activeFeatures: string[] = [];
     if (secretsHidden) {
       activeFeatures.push('Secrets');
@@ -41,11 +34,17 @@ export class StatusBarManager {
       activeFeatures.push('Docstrings');
     }
 
-    if (activeFeatures.length === 0) {
-      this.statusBarItem.text = '$(eye-closed) Code Cloak: Ready';
-      this.statusBarItem.tooltip = 'Code Cloak is enabled but no features are active';
+    const icon = enabled ? '$(eye-closed)' : '$(eye)';
+    const status = enabled ? 'On' : 'Off';
+    this.statusBarItem.text = `${icon} Cloak: ${status}`;
+
+    if (!enabled) {
+      this.statusBarItem.tooltip = 'Click to toggle Code Cloak';
+      this.statusBarItem.backgroundColor = undefined;
+    } else if (activeFeatures.length === 0) {
+      this.statusBarItem.tooltip = 'Code Cloak is enabled but no features are active\nClick to toggle';
+      this.statusBarItem.backgroundColor = undefined;
     } else {
-      this.statusBarItem.text = `$(eye-closed) Code Cloak: ${activeFeatures.join(', ')}`;
       this.statusBarItem.tooltip = `Hiding: ${activeFeatures.join(', ')}\nClick to toggle`;
       this.statusBarItem.backgroundColor = new vscode.ThemeColor(
         'statusBarItem.warningBackground'

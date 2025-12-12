@@ -69,11 +69,12 @@ export class CommentParser extends BaseParser {
         const commentMatch = line.match(/\/\/(.*)$|#(.*)$/);
         if (commentMatch) {
           const commentText = commentMatch[1] || commentMatch[2];
-          const start = line.indexOf(commentText);
+          // Find the start of the comment delimiter (// or #)
+          const delimiterStart = line.indexOf('//') !== -1 ? line.indexOf('//') : line.indexOf('#');
           results.push({
             key: 'comment',
             value: commentText,
-            range: this.createRange(i, start - 2, line.length),
+            range: this.createRange(i, Math.max(0, delimiterStart), line.length),
             lineNumber: i,
           });
         }

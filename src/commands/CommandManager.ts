@@ -26,6 +26,9 @@ export class CommandManager {
     context.subscriptions.push(
       vscode.commands.registerCommand('codeCloak.toggle', async () => await this.toggleExtension())
     );
+    context.subscriptions.push(
+      vscode.commands.registerCommand('codeCloak.showQuickPick', async () => await this.showQuickPickMenu())
+    );
 
     // Feature-specific commands
     context.subscriptions.push(
@@ -237,6 +240,72 @@ export class CommandManager {
     const editor = vscode.window.activeTextEditor;
     if (editor) {
       this.decorationManager.updateDecorations(editor);
+    }
+  }
+
+  private async showQuickPickMenu(): Promise<void> {
+    const enabled = this.configManager.isEnabled();
+    const secretsHidden = this.configManager.isSecretsHidden();
+    const typesHidden = this.configManager.isTypesHidden();
+    const commentsHidden = this.configManager.isCommentsHidden();
+    const docstringsHidden = this.configManager.isDocstringsHidden();
+
+    interface QuickPickItemWithAction extends vscode.QuickPickItem {
+      action: () => Promise<void>;
+    }
+
+    const items: QuickPickItemWithAction[] = [
+      {
+        label: `$(${enabled ? 'eye' : 'eye-closed'}) ${enabled ? 'Disable' : 'Enable'} Code Cloak`,
+        description: enabled ? 'Turn off all cloaking' : 'Turn on cloaking',
+        action: async () => enabled ? await this.disableExtension() : await this.enableExtension()
+      },
+      {
+        label: '',
+        description: '',
+        kind: vscode.QuickPickItemKind.Separator,
+        action: async () => {}
+      },
+      {
+        label: `$(${secretsHidden ? 'eye' : 'eye-closed'}) ${secretsHidden ? 'Show' : 'Hide'} Secrets`,
+        description: secretsHidden ? 'Reveal API keys and tokens' : 'Hide API keys and tokens',
+        action: async () => secretsHidden ? this.showSecrets() : this.hideSecrets()
+      },
+      {
+        label: `$(${typesHidden ? 'eye' : 'eye-closed'}) ${typesHidden ? 'Show' : 'Hide'} Type Annotations`,
+        description: secretsHidden ? 'Reveal type hints' : 'Hide type hints',
+        action: async () => typesHidden ? this.showTypes() : this.hideTypes()
+      },
+      {
+        label: `$(${commentsHidden ? 'eye' : 'eye-closed'}) ${commentsHidden ? 'Show' : 'Hide'} Comments`,
+        description: commentsHidden ? 'Reveal comments' : 'Hide comments',
+        action: async () => commentsHidden ? await this.showComments() : await this.hideComments()
+      },
+      {
+        label: `$(${docstringsHidden ? 'eye' : 'eye-closed'}) ${docstringsHidden ? 'Show' : 'Hide'} Docstrings`,
+        description: docstringsHidden ? 'Reveal docstrings' : 'Hide docstrings',
+        action: async () => docstringsHidden ? await this.showDocstrings() : await this.hideDocstrings()
+      },
+      {
+        label: '',
+        description: '',
+        kind: vscode.QuickPickItemKind.Separator,
+        action: async () => {}
+      },
+      {
+        label: '$(paintcan) Change Style',
+        description: 'Change the cloaking visual style',
+        action: async () => await this.changeStyle()
+      }
+    ];
+
+    const selected = await vscode.window.showQuickPick(items, {
+      placeHolder: 'Code Cloak Settings',
+      matchOnDescription: true
+    });
+
+    if (selected) {
+      await selected.action();
     }
   }
 }

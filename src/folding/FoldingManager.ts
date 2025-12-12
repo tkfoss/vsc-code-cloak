@@ -41,13 +41,33 @@ export class FoldingManager {
 
     // Fold the collected ranges
     if (ranges.length > 0) {
+      // Save the current selection and visible range
+      const originalSelection = editor.selection;
+      const visibleRanges = editor.visibleRanges;
+
       await this.foldRanges(editor, ranges);
+
+      // Restore the original selection and scroll position
+      editor.selection = originalSelection;
+      if (visibleRanges.length > 0) {
+        editor.revealRange(visibleRanges[0], vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+      }
     }
   }
 
   public async unfoldAll(editor: vscode.TextEditor): Promise<void> {
+    // Save the current selection and visible range before unfolding
+    const originalSelection = editor.selection;
+    const visibleRanges = editor.visibleRanges;
+
     // Unfold all regions in the editor
     await vscode.commands.executeCommand('editor.unfoldAll');
+
+    // Restore the original selection and scroll position
+    editor.selection = originalSelection;
+    if (visibleRanges.length > 0) {
+      editor.revealRange(visibleRanges[0], vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+    }
   }
 
   private async foldRanges(editor: vscode.TextEditor, ranges: vscode.Range[]): Promise<void> {
