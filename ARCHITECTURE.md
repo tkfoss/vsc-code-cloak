@@ -1,290 +1,156 @@
-# VSC Code Cloak - Architecture Documentation
+# Architecture
 
-## Overview
+Internal design of VSC Code Cloak. For user-facing documentation see
+[README.md](README.md).
 
-VSC Code Cloak is a comprehensive Visual Studio Code extension that combines features from multiple code privacy extensions into a unified solution. It allows hiding secrets, type annotations, comments, and docstrings during screen sharing, streaming, or recording.
-
-## Repository Analysis Summary
-
-This extension was built by analyzing and combining the best features from 5 existing repositories:
-
-### 1. Camouflage (zeybek/camouflage)
-- **Focus**: Multi-format configuration file secret hiding
-- **Features Used**:
-  - Multiple file format support (.env, .json, .yaml, .properties, .toml, .sh)
-  - Multiple hiding styles (text, dotted, stars, scramble)
-  - Selective hiding with pattern matching
-  - Context menu integration
-  - Status bar indicator
-  - Keyboard shortcuts
-
-### 2. Censitive (1nVitr0/plugin-vscode-censitive)
-- **Focus**: Custom `.censitive` config file approach
-- **Features Used**:
-  - Regex-based key-value detection
-  - Fenced censoring concept
-  - Code action providers
-
-### 3. Toggle Docstrings (GrayRigel/toggle-docstrings)
-- **Focus**: Python/Jupyter docstring visibility
-- **Features Used**:
-  - Docstring detection and hiding
-  - Simple toggle mechanism
-
-### 4. Cloak (johnpapa/vscode-cloak)
-- **Focus**: Basic .env file hiding
-- **Features Used**:
-  - TextMateRules approach
-  - Simple command structure
-  - Extension dependency concept
-
-### 5. vsc-code-cloak (this repository)
-- **Original State**: Empty repository with basic README
-- **New State**: Fully functional extension with unified features
-
-## Architecture
-
-### Project Structure
+## Layers
 
 ```
-vsc-code-cloak/
-├── src/
-│   ├── extension.ts              # Main entry point
-│   ├── config/
-│   │   └── ConfigManager.ts      # Configuration management
-│   ├── commands/
-│   │   └── CommandManager.ts     # Command registration and handling
-│   ├── decorations/
-│   │   └── DecorationManager.ts  # Text decoration management
-│   ├── parsers/
-│   │   ├── BaseParser.ts         # Abstract parser base class
-│   │   ├── EnvParser.ts          # .env file parser
-│   │   ├── JsonParser.ts         # JSON file parser
-│   │   ├── YamlParser.ts         # YAML file parser
-│   │   ├── TypeAnnotationParser.ts # TypeScript/Python type parser
-│   │   ├── CommentParser.ts      # Comment parser
-│   │   └── DocstringParser.ts    # Python docstring parser
-│   └── ui/
-│       └── StatusBarManager.ts   # Status bar indicator
-├── package.json                   # Extension manifest
-├── tsconfig.json                  # TypeScript configuration
-├── .eslintrc.json                 # ESLint configuration
-├── .prettierrc                    # Prettier configuration
-├── .gitignore                     # Git ignore rules
-├── LICENSE                        # MIT License
-├── README.md                      # User documentation
-└── ARCHITECTURE.md                # This file
-
-Compiled Output:
-├── out/                           # Compiled JavaScript
+extension.ts          activation, event wiring, disposal
+  ConfigManager       settings + per-session visibility state
+  DecorationManager   parse results -> masking decorations
+  FoldingManager      parse results -> folded regions
+  FoldingRangeProvider
+  CommandManager      the codeCloak.* commands
+  StatusBarManager    status indicator
+  parsers/            source text -> ParseResult[]
 ```
 
-### Core Components
+Only `extension.ts` knows about activation. Every manager takes its
+collaborators through the constructor, so each one can be built and tested in
+isolation with a stub `vscode` module.
 
-#### 1. Extension.ts
-- **Purpose**: Main extension activation and lifecycle management
-- **Responsibilities**:
-  - Initialize managers (Config, Decoration, StatusBar, Command)
-  - Register event handlers for editor changes
-  - Handle configuration updates
-  - Coordinate between components
+## Data flow
 
-#### 2. ConfigManager
-- **Purpose**: Centralized configuration management
-- **Features**:
-  - Load and reload VS Code settings
-  - Manage feature states (secrets, types, comments, docstrings)
-  - Pattern matching for key detection
-  - File exclusion management
-  - Exclude key list management
-
-#### 3. DecorationManager
-- **Purpose**: Apply visual decorations to hide content
-- **Features**:
-  - Multiple decoration styles (text, dots, stars, scramble, blur, block)
-  - Coordinate multiple parsers
-  - Create and manage TextEditorDecorations
-  - Handle hover messages
-  - Refresh decorations on config changes
-
-#### 4. CommandManager
-- **Purpose**: Handle all extension commands
-- **Commands**:
-  - Main toggle: enable/disable/toggle
-  - Feature toggles: secrets, types, comments, docstrings
-  - File management: exclude/include file
-  - Style change: change hiding style
-  - Line operations: toggle current line, add to exclude list
-
-#### 5. StatusBarManager
-- **Purpose**: Display extension status in status bar
-- **Features**:
-  - Show enabled/disabled state
-  - Display active features
-  - Click to toggle extension
-  - Warning indicator when features active
-
-#### 6. Parsers
-All parsers extend `BaseParser` and implement:
-- `canParse(document)`: Check if parser can handle document
-- `parse(document)`: Extract content to hide
-
-**Parser Types**:
-- **EnvParser**: Handles .env files, export statements
-- **JsonParser**: Handles JSON key-value pairs
-- **YamlParser**: Handles YAML key-value pairs
-- **TypeAnnotationParser**: Handles TypeScript/Python type annotations
-- **CommentParser**: Handles single-line and block comments
-- **DocstringParser**: Handles Python triple-quoted docstrings
-
-## Features
-
-### 1. Multi-Feature Support
-- Secrets hiding in configuration files
-- Type annotation hiding in TypeScript/Python
-- Comment hiding (single-line and block)
-- Docstring hiding in Python
-
-### 2. Multiple Hiding Styles
-- **Text**: Replace with custom text
-- **Dots**: Replace with bullet points
-- **Stars**: Replace with asterisks
-- **Scramble**: Randomly shuffle characters
-- **Blur**: Apply CSS blur filter
-- **Block**: Solid color block
-
-### 3. Smart Pattern Matching
-- Wildcard support: `*KEY*`, `KEY*`, `*KEY`
-- Case-insensitive matching
-- Exclude list to prevent hiding specific keys
-- File exclusion support
-
-### 4. User Interface
-- Status bar indicator with active features
-- Context menu integration
-- Keyboard shortcuts
-- Command palette commands
-- Hover preview (optional)
-
-## Configuration
-
-### Key Settings
-
-```typescript
-{
-  enabled: boolean;              // Master enable/disable
-  autoHide: boolean;             // Auto-hide on file open
-  features: {
-    secrets: boolean;            // Enable secret hiding
-    types: boolean;              // Enable type hiding
-    comments: boolean;           // Enable comment hiding
-    docstrings: boolean;         // Enable docstring hiding
-  };
-  secrets: {
-    filePatterns: string[];      // File patterns to scan
-    keyPatterns: string[];       // Patterns for keys to hide
-    excludeKeys: string[];       // Keys to never hide
-  };
-  appearance: {
-    style: string;               // Hiding style
-    hiddenText: string;          // Replacement text
-    textColor: string;           // Text color
-    backgroundColor: string;     // Background color
-    opacity: number;             // Opacity for blur
-  };
-}
+```
+document change ──debounce 120ms──> DecorationManager.updateDocument
+                                          │
+                     ConfigManager gates ──┤ enabled? feature on? file excluded?
+                                          │ file pattern? language? line revealed?
+                                          ▼
+                                     parser.parse(document) -> ParseResult[]
+                                          │
+                                          ▼
+                       DecorationOptions[] -> editor.setDecorations
 ```
 
-## Extension Points
+Folding runs on a separate path, because folds are editor state rather than a
+rendering pass: `FoldingRangeProvider` publishes foldable ranges to VS Code,
+and `FoldingManager` collapses them by issuing `editor.fold`. It records the
+lines it folded so `unfoldAll` can reopen exactly those, leaving folds the user
+made themselves closed.
 
-### Commands
-All commands are prefixed with `codeCloak.`:
-- `enable`, `disable`, `toggle`
-- `hideSecrets`, `showSecrets`
-- `hideTypes`, `showTypes`
-- `hideComments`, `showComments`
-- `hideDocstrings`, `showDocstrings`
-- `toggleCurrentLine`, `addToExcludeList`
-- `excludeFile`, `includeFile`
-- `changeStyle`
+## Key invariant: single-line ranges
 
-### Keyboard Shortcuts
-- `Ctrl+Shift+Alt+H`: Toggle extension
-- `Ctrl+Shift+Alt+S`: Toggle secrets
-- `Ctrl+Shift+Alt+T`: Toggle types
-- `Ctrl+Shift+Alt+C`: Toggle comments
-- `Ctrl+Shift+Alt+D`: Toggle docstrings
-- `Ctrl+Shift+Alt+L`: Toggle current line
+A decoration can restyle a range but cannot remove lines, so a masked range
+**must** be single-line.
 
-### Context Menu
-Submenu under "Code Cloak" with all commands organized by function.
+Parsers may still emit multi-line results: `DecorationManager.toSingleLines`
+splits them into one range per line before rendering, keeping each line's
+indent so the block holds its shape. Folding consumes the unsplit ranges.
 
-## Technical Details
+Both layers are needed, and neither is sufficient. A fold renders its opening
+line, so folding alone leaves the first line of a docstring on screen; masking
+alone leaves twenty masked rows where one folded row would do. Masking is the
+layer that guarantees nothing is readable, and folding is the layer that makes
+it compact.
 
-### Dependencies
-- **Runtime**: VS Code API only (no external runtime dependencies)
-- **Development**:
-  - TypeScript 5.4+
-  - ESLint 8+
-  - Prettier 3+
-  - Jest 29+ (for testing)
-  - @vscode/vsce (for packaging)
+`PythonASTParser` and `TypeScriptASTParser` still discard annotations that wrap
+across lines: an annotation is not prose, and splitting one across lines would
+mask the code interleaved with it.
 
-### Performance Considerations
-- Parsers run on document change (throttled by VS Code)
-- Decorations are editor-specific (not document-specific)
-- Pattern matching uses compiled RegExp
-- Large files may experience brief delays
+## Masking mechanism
 
-### Limitations
-- Visual hiding only (doesn't modify files)
-- Brief delay on file open before hiding
-- Complex syntax may not parse correctly
-- Decorations may flicker on editor switch
+`text`, `dots`, `stars` and `scramble` hide the original range with
+`textDecoration: 'none; display: none'` and draw the replacement as a `before`
+pseudo-element. `display: none` — rather than transparency — is what keeps the
+original text out of the layout, so the replacement is not drawn beside the
+value it replaces.
 
-## Development
+`blur` and `block` paint over the text in place and therefore preserve its
+width, which reveals the length of what they cover. That trade-off is the
+user's to make; it is documented in the README rather than hidden.
 
-### Building
-```bash
-npm install          # Install dependencies
-npm run compile      # Compile TypeScript
-npm run watch        # Watch mode for development
+## Parsers
+
+Every parser extends `BaseParser`:
+
+```ts
+canParse(document): boolean
+parse(document): ParseResult[]
 ```
 
-### Testing
-```bash
-npm run test         # Run tests
-npm run test:watch   # Watch mode
-npm run test:coverage # Coverage report
-```
+`ParseResult.kind` routes the result to a feature toggle. `ParseResult.key`
+carries the key name for secrets and `'line'`/`'block'` for comments, so the two
+`comments.*` settings can be honoured independently.
 
-### Packaging
-```bash
-npm run package      # Create .vsix file
-```
+`BaseParser.readValue` is shared by the key/value parsers. It resolves a value
+span from a delimiter position rather than searching for the value's text: an
+`indexOf` search finds the wrong span whenever the value also occurs earlier in
+the line, as in `TOKEN=TOKEN`.
 
-## Future Enhancements
+| Parser | Approach |
+|---|---|
+| `EnvParser`, `PropertiesParser` | Line regex for the key, `readValue` for the span |
+| `JsonParser` | Character scanner. Deliberately avoids `JSON.parse`: a file being edited is invalid most of the time, and refusing to parse would unhide secrets exactly while they are typed |
+| `YamlParser` | Line-oriented, with block-scalar continuation emitted line by line |
+| `TypeScriptASTParser` | `ts.createSourceFile` and a visitor; does not descend into a type node it has already reported, to avoid overlapping decorations |
+| `PythonASTParser` | Offset scanner over the whole document, so wrapped signatures parse correctly. Signature spans are recorded and skipped by the variable-annotation pass, which would otherwise match a wrapped parameter twice |
+| `CommentParser` | Per-language delimiter table plus string tracking, so a delimiter inside a literal is not a comment |
+| `DocstringParser` | Triple-quoted strings that begin a line |
 
-Potential features to consider:
-1. Custom regex patterns for secret detection
-2. Language-specific parsers (Ruby, PHP, Go, etc.)
-3. Export/import configuration profiles
-4. Workspace-specific settings
-5. Team sharing of .censor config files
-6. Performance optimization for large files
-7. Better syntax tree parsing
-8. Integration with secret scanning tools
-9. Temporary reveal on hover (with delay)
-10. Toggle by selection
+### Adding a secret format
 
-## Credits
+1. Subclass `BaseParser`, using `readValue` for the value span.
+2. Register it in `DecorationManager.secretParsers` (first match wins).
+3. Add its extension to the `codeCloak.secrets.filePatterns` default in
+   `package.json` — the file gate runs before `canParse`, so a parser not
+   covered by a default pattern is unreachable out of the box.
+4. Add a case to `test/secretParsers.test.ts`.
 
-Built with inspiration from:
-- Camouflage by Ahmet Zeybek
-- Cloak by John Papa
-- Censitive by 1nVitr0
-- Toggle Docstrings by GrayRigel
+## Performance
 
-## License
+- Edits are debounced by 120 ms; without it the TypeScript parser rebuilds a
+  full AST on every keystroke.
+- `DecorationManager` caches decorations per `(document version, revision)`.
+  `ConfigManager.getRevision()` is a counter bumped by every mutator, so a
+  settings change invalidates the cache without a separate notification path.
+  It was a `JSON.stringify` of the whole config, which ran on every redraw of
+  every visible editor — including cache hits.
+- The decoration type is rebuilt only when the appearance settings baked into it
+  change. Disposing one drops its decorations from every editor at once, which
+  flickered the masks off and back on for an ordinary hide/show toggle.
+- Glob patterns compile to `RegExp` once and are cached until settings reload.
+- `FoldingManager` folds every range in one `editor.fold` call. Folding them
+  one at a time moves the cursor repeatedly and scrolls the document.
 
-MIT License - See LICENSE file for details
+## Dependencies
+
+`typescript` is a **runtime** dependency, not just a build tool: the TypeScript
+parser calls `ts.createSourceFile` at runtime. Only `lib/typescript.js` is
+needed, so `.vscodeignore` strips the compiler CLI, the language server and the
+bundled `lib.*.d.ts` declarations from the VSIX (4.3 MB → 1.6 MB). Calling
+`ts.createProgram` would need those declarations back.
+
+## Testing
+
+`npm test` runs Jest against the parsers and managers. The real `vscode` module
+only exists inside the extension host, so `jest.config.js` maps `vscode` to
+`test/vscode.ts`, a stub implementing the small surface the extension uses.
+
+`test/manifest.test.ts` cross-checks `package.json` against the code: every
+contributed command has a handler, every registered command is contributed, and
+keybindings and menus reference commands that exist. A command registered but
+not contributed is invisible in the palette, which is how
+`codeCloak.showQuickPick` went unreachable before 1.1.0.
+
+## Known trade-offs
+
+- Folds are ordinary editor folds, so an unrelated `Unfold All` reveals them.
+  Nothing is exposed by that: the masking underneath is independent, so the
+  region is shown masked rather than collapsed.
+- A comment trailing code cannot be folded, only masked. Folding is line-based,
+  so collapsing that line would hide the code beside it.
+- Values are briefly visible between a keystroke and the debounced redraw.
+- `DocstringParser` treats any triple-quoted string that begins a line as a
+  docstring. Broader than PEP 257, and the safer default here.

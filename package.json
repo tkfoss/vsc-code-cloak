@@ -2,16 +2,19 @@
   "name": "vsc-code-cloak",
   "displayName": "VSC Code Cloak",
   "description": "Universal code privacy extension - hide secrets, types, comments, docstrings and more during screen sharing",
-  "version": "1.0.0",
-  "publisher": "vsc-code-cloak",
+  "version": "1.2.0",
+  "publisher": "tkfoss",
   "author": {
-    "name": "VSC Code Cloak",
-    "email": "hello@vsc-code-cloak.dev"
+    "name": "VSC Code Cloak"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/vsc-code-cloak/vsc-code-cloak.git"
+    "url": "https://github.com/tkfoss/vsc-code-cloak.git"
   },
+  "bugs": {
+    "url": "https://github.com/tkfoss/vsc-code-cloak/issues"
+  },
+  "homepage": "https://github.com/tkfoss/vsc-code-cloak#readme",
   "license": "MIT",
   "icon": "assets/icon.png",
   "engines": {
@@ -51,6 +54,11 @@
   "contributes": {
     "commands": [
       {
+        "command": "codeCloak.showQuickPick",
+        "title": "Code Cloak: Show Menu",
+        "icon": "$(eye-closed)"
+      },
+      {
         "command": "codeCloak.enable",
         "title": "Code Cloak: Enable",
         "icon": "$(eye-closed)"
@@ -66,6 +74,11 @@
         "icon": "$(eye-closed)"
       },
       {
+        "command": "codeCloak.toggleSecrets",
+        "title": "Code Cloak: Toggle Secrets",
+        "icon": "$(lock)"
+      },
+      {
         "command": "codeCloak.hideSecrets",
         "title": "Code Cloak: Hide Secrets",
         "icon": "$(lock)"
@@ -74,6 +87,11 @@
         "command": "codeCloak.showSecrets",
         "title": "Code Cloak: Show Secrets",
         "icon": "$(unlock)"
+      },
+      {
+        "command": "codeCloak.toggleTypes",
+        "title": "Code Cloak: Toggle Type Annotations",
+        "icon": "$(symbol-type-parameter)"
       },
       {
         "command": "codeCloak.hideTypes",
@@ -86,6 +104,11 @@
         "icon": "$(symbol-type-parameter)"
       },
       {
+        "command": "codeCloak.toggleComments",
+        "title": "Code Cloak: Toggle Comments",
+        "icon": "$(comment)"
+      },
+      {
         "command": "codeCloak.hideComments",
         "title": "Code Cloak: Hide Comments",
         "icon": "$(comment)"
@@ -96,6 +119,11 @@
         "icon": "$(comment)"
       },
       {
+        "command": "codeCloak.toggleDocstrings",
+        "title": "Code Cloak: Toggle Docstrings",
+        "icon": "$(book)"
+      },
+      {
         "command": "codeCloak.hideDocstrings",
         "title": "Code Cloak: Hide Docstrings",
         "icon": "$(book)"
@@ -104,6 +132,21 @@
         "command": "codeCloak.showDocstrings",
         "title": "Code Cloak: Show Docstrings",
         "icon": "$(book)"
+      },
+      {
+        "command": "codeCloak.toggleFolding",
+        "title": "Code Cloak: Toggle Folding",
+        "icon": "$(fold)"
+      },
+      {
+        "command": "codeCloak.foldCloaked",
+        "title": "Code Cloak: Fold Cloaked Regions",
+        "icon": "$(fold-up)"
+      },
+      {
+        "command": "codeCloak.unfoldCloaked",
+        "title": "Code Cloak: Unfold Cloaked Regions",
+        "icon": "$(fold-down)"
       },
       {
         "command": "codeCloak.toggleCurrentLine",
@@ -142,7 +185,7 @@
         "codeCloak.autoHide": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically hide configured items when opening files"
+          "description": "Start each session with the enabled features hidden"
         },
         "codeCloak.features.secrets": {
           "type": "boolean",
@@ -174,15 +217,17 @@
             "*.env",
             ".envrc",
             "*.json",
+            "*.jsonc",
             "*.yaml",
             "*.yml",
             "*.properties",
             "*.ini",
             "*.conf",
+            "*.cfg",
             "*.toml",
             "*.sh"
           ],
-          "description": "File patterns for secret detection"
+          "description": "Glob patterns, matched against the file name, selecting which files are scanned for secrets"
         },
         "codeCloak.secrets.keyPatterns": {
           "type": "array",
@@ -225,36 +270,51 @@
           "type": "string",
           "enum": [
             "text",
+            "compact",
             "dots",
             "stars",
             "scramble",
             "blur",
             "block"
           ],
-          "default": "text",
-          "description": "Style of hidden content"
+          "default": "compact",
+          "description": "Style of hidden content. \"compact\" shrinks the mask only where it shares a line with code, so type annotations stop distorting the line without masked whole lines looking blank",
+          "enumDescriptions": [
+            "The codeCloak.appearance.hiddenText string, everywhere",
+            "One glyph where the mask shares its line with code, the full marker where it owns the line",
+            "One dot per hidden character",
+            "One star per hidden character",
+            "The hidden characters, shuffled",
+            "The original text, blurred in place",
+            "A solid block painted over the original text"
+          ]
         },
         "codeCloak.appearance.hiddenText": {
           "type": "string",
           "default": "***HIDDEN***",
           "description": "Text to display for hidden content"
         },
+        "codeCloak.appearance.compactText": {
+          "type": "string",
+          "default": "\u2022",
+          "description": "Glyph drawn by the \"compact\" style where a mask shares its line with code. A mask that owns its whole line uses codeCloak.appearance.hiddenText instead, so it cannot be mistaken for a blank line"
+        },
         "codeCloak.appearance.textColor": {
           "type": "string",
           "default": "auto",
-          "description": "Color of hidden text (auto, transparent, or CSS color)"
+          "description": "Colour of the replacement text (auto, or any CSS colour)"
         },
         "codeCloak.appearance.backgroundColor": {
           "type": "string",
           "default": "auto",
-          "description": "Background color for hidden content (auto, transparent, or CSS color)"
+          "description": "Colour of the covering block (auto, or any CSS colour); block style only"
         },
         "codeCloak.appearance.opacity": {
           "type": "number",
           "default": 0.3,
           "minimum": 0,
           "maximum": 1,
-          "description": "Opacity for blur style (0-1)"
+          "description": "Opacity of hidden content (blur style only)"
         },
         "codeCloak.types.languages": {
           "type": "array",
@@ -289,13 +349,34 @@
           ],
           "description": "Languages for docstring hiding"
         },
+        "codeCloak.folding.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Collapse cloaked comments and docstrings instead of leaving a stack of masked lines"
+        },
+        "codeCloak.folding.inline": {
+          "type": "boolean",
+          "default": true,
+          "description": "Also collapse runs of consecutive whole-line comments into a single folded region. A comment trailing code is never folded -- collapsing its line would hide the code too -- and stays masked in place"
+        },
+        "codeCloak.folding.minimumLines": {
+          "type": "number",
+          "default": 2,
+          "minimum": 2,
+          "description": "Fewest lines a region must span before it is folded"
+        },
+        "codeCloak.folding.trimBlankLines": {
+          "type": "boolean",
+          "default": true,
+          "description": "Extend each folded region over the blank lines directly beneath it, so collapsing a comment or docstring does not leave a gap where it used to be"
+        },
         "codeCloak.files.excluded": {
           "type": "array",
           "items": {
             "type": "string"
           },
           "default": [],
-          "description": "File paths to exclude from Code Cloak"
+          "description": "Paths never cloaked. Accepts an exact path, a directory, or a glob"
         },
         "codeCloak.hover.showPreview": {
           "type": "boolean",
@@ -316,28 +397,34 @@
         "mac": "cmd+shift+alt+h"
       },
       {
-        "command": "codeCloak.hideSecrets",
+        "command": "codeCloak.toggleSecrets",
         "key": "ctrl+shift+alt+s",
         "mac": "cmd+shift+alt+s",
         "when": "editorTextFocus"
       },
       {
-        "command": "codeCloak.hideTypes",
+        "command": "codeCloak.toggleTypes",
         "key": "ctrl+shift+alt+t",
         "mac": "cmd+shift+alt+t",
         "when": "editorTextFocus && (editorLangId == typescript || editorLangId == typescriptreact || editorLangId == python)"
       },
       {
-        "command": "codeCloak.hideComments",
+        "command": "codeCloak.toggleComments",
         "key": "ctrl+shift+alt+c",
         "mac": "cmd+shift+alt+c",
         "when": "editorTextFocus"
       },
       {
-        "command": "codeCloak.hideDocstrings",
+        "command": "codeCloak.toggleDocstrings",
         "key": "ctrl+shift+alt+d",
         "mac": "cmd+shift+alt+d",
         "when": "editorTextFocus && (editorLangId == python || editorLangId == jupyter)"
+      },
+      {
+        "command": "codeCloak.toggleFolding",
+        "key": "ctrl+shift+alt+f",
+        "mac": "cmd+shift+alt+f",
+        "when": "editorTextFocus"
       },
       {
         "command": "codeCloak.toggleCurrentLine",
@@ -354,6 +441,11 @@
         }
       ],
       "codeCloak.mainMenu": [
+        {
+          "command": "codeCloak.showQuickPick",
+          "when": "config.codeCloak.enabled",
+          "group": "0_menu@1"
+        },
         {
           "command": "codeCloak.enable",
           "when": "!config.codeCloak.enabled",
@@ -415,6 +507,21 @@
           "group": "3_selection@2"
         },
         {
+          "command": "codeCloak.foldCloaked",
+          "when": "config.codeCloak.enabled && config.codeCloak.folding.enabled",
+          "group": "3_selection@3"
+        },
+        {
+          "command": "codeCloak.unfoldCloaked",
+          "when": "config.codeCloak.enabled && config.codeCloak.folding.enabled",
+          "group": "3_selection@4"
+        },
+        {
+          "command": "codeCloak.toggleFolding",
+          "when": "config.codeCloak.enabled",
+          "group": "3_selection@5"
+        },
+        {
           "command": "codeCloak.excludeFile",
           "when": "config.codeCloak.enabled",
           "group": "4_file@1"
@@ -444,10 +551,13 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src --ext ts",
-    "format": "prettier --write \"src/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "icon": "node scripts/generate-icon.js",
     "package": "vsce package"
   },
   "dependencies": {

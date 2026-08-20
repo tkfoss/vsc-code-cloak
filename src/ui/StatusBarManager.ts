@@ -1,55 +1,50 @@
 import * as vscode from 'vscode';
-import { ConfigManager } from '../config/ConfigManager';
+import { CloakFeature, ConfigManager } from '../config/ConfigManager';
 
+const FEATURE_LABELS: Array<[CloakFeature, string]> = [
+  ['secrets', 'Secrets'],
+  ['types', 'Types'],
+  ['comments', 'Comments'],
+  ['docstrings', 'Docstrings'],
+];
+
+/**
+ * Status bar entry reporting what is currently hidden.
+ *
+ * The warning background is deliberate: while content is cloaked the editor is
+ * not showing the whole truth, and that needs to be obvious at a glance rather
+ * than something the user has to remember.
+ */
 export class StatusBarManager {
-  private statusBarItem: vscode.StatusBarItem;
+  private readonly statusBarItem: vscode.StatusBarItem;
 
-  constructor(private configManager: ConfigManager) {
-    this.statusBarItem = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Right,
-      100
-    );
-    this.statusBarItem.command = 'codeCloak.toggle';
+  constructor(private readonly configManager: ConfigManager) {
+    this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+    this.statusBarItem.name = 'Code Cloak';
+    this.statusBarItem.command = 'codeCloak.showQuickPick';
     this.statusBarItem.show();
   }
 
   public update(): void {
     const enabled = this.configManager.isEnabled();
-    const secretsHidden = this.configManager.isSecretsHidden();
-    const typesHidden = this.configManager.isTypesHidden();
-    const commentsHidden = this.configManager.isCommentsHidden();
-    const docstringsHidden = this.configManager.isDocstringsHidden();
+    const active = FEATURE_LABELS.filter(([feature]) => this.configManager.isHidden(feature)).map(
+      ([, label]) => label
+    );
 
-    const activeFeatures: string[] = [];
-    if (secretsHidden) {
-      activeFeatures.push('Secrets');
-    }
-    if (typesHidden) {
-      activeFeatures.push('Types');
-    }
-    if (commentsHidden) {
-      activeFeatures.push('Comments');
-    }
-    if (docstringsHidden) {
-      activeFeatures.push('Docstrings');
-    }
-
-    const icon = enabled ? '$(eye-closed)' : '$(eye)';
-    const status = enabled ? 'On' : 'Off';
-    this.statusBarItem.text = `${icon} Cloak: ${status}`;
+    this.statusBarItem.text = `${enabled ? '$(eye-closed)' : '$(eye)'} Cloak: ${enabled ? 'On' : 'Off'}`;
 
     if (!enabled) {
-      this.statusBarItem.tooltip = 'Click to toggle Code Cloak';
+      this.statusBarItem.tooltip = 'Code Cloak is off\nClick for options';
       this.statusBarItem.backgroundColor = undefined;
-    } else if (activeFeatures.length === 0) {
-      this.statusBarItem.tooltip = 'Code Cloak is enabled but no features are active\nClick to toggle';
+    } else if (active.length === 0) {
+      this.statusBarItem.tooltip = 'Code Cloak is on but nothing is hidden\nClick for options';
       this.statusBarItem.backgroundColor = undefined;
     } else {
-      this.statusBarItem.tooltip = `Hiding: ${activeFeatures.join(', ')}\nClick to toggle`;
-      this.statusBarItem.backgroundColor = new vscode.ThemeColor(
-        'statusBarItem.warningBackground'
-      );
+      this.statusBarItem.tooltip = `Hiding: ${active.join(', ')}\nClick for options`;
+      this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
     }
+
+    this.statusBarItem.accessibilityInformation = { label: this.statusBarItem.tooltip };
   }
 
   public dispose(): void {

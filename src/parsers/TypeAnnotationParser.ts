@@ -3,23 +3,15 @@ import { BaseParser, ParseResult } from './BaseParser';
 import { TypeScriptASTParser } from './TypeScriptASTParser';
 import { PythonASTParser } from './PythonASTParser';
 
-/**
- * Main type annotation parser that delegates to language-specific AST parsers
- */
+/** Dispatches type-annotation parsing to the parser for the document's language. */
 export class TypeAnnotationParser extends BaseParser {
-  private tsParser = new TypeScriptASTParser();
-  private pyParser = new PythonASTParser();
+  private readonly parsers: BaseParser[] = [new PythonASTParser(), new TypeScriptASTParser()];
 
   canParse(document: vscode.TextDocument): boolean {
-    return this.tsParser.canParse(document) || this.pyParser.canParse(document);
+    return this.parsers.some((parser) => parser.canParse(document));
   }
 
   parse(document: vscode.TextDocument): ParseResult[] {
-    if (this.pyParser.canParse(document)) {
-      return this.pyParser.parse(document);
-    } else if (this.tsParser.canParse(document)) {
-      return this.tsParser.parse(document);
-    }
-    return [];
+    return this.parsers.find((parser) => parser.canParse(document))?.parse(document) ?? [];
   }
 }

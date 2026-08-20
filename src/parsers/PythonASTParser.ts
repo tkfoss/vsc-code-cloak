@@ -2,262 +2,270 @@ import * as vscode from 'vscode';
 import { BaseParser, ParseResult } from './BaseParser';
 
 /**
- * Python AST-inspired parser for type annotations
- * Uses a more sophisticated tokenization approach than simple regex
+ * Extracts Python type annotations: parameter annotations, return annotations
+ * and variable annotations (PEP 526).
+ *
+ * Works on offsets over the whole document rather than line by line, because
+ * function signatures are routinely wrapped across several lines. Annotations
+ * that themselves span more than one line are skipped, since the decoration
+ * layer can only mask single-line ranges.
  */
 export class PythonASTParser extends BaseParser {
+  private static readonly DEF = /(?:^|\n)[ \t]*(?:async[ \t]+)?def[ \t]+[A-Za-z_]\w*[ \t]*\(/g;
+  private static readonly VARIABLE =
+    /^([ \t]*)((?:self\.|cls\.)?[A-Za-z_]\w*)[ \t]*(:)[ \t]*([^=\n]+?)[ \t]*(?:=(?!=)|$)/;
+
   canParse(document: vscode.TextDocument): boolean {
     return document.languageId === 'python';
   }
 
   parse(document: vscode.TextDocument): ParseResult[] {
-    const results: ParseResult[] = [];
     const text = document.getText();
+    const results: ParseResult[] = [];
+
+    const signatures = this.parseSignatures(document, text, results);
+    this.parseVariableAnnotations(document, text, signatures, results);
+
+    return results.sort((a, b) => a.range.start.compareTo(b.range.start));
+  }
+
+  /** Parses every `def` signature and returns the offset span each one covers. */
+  private parseSignatures(
+    document: vscode.TextDocument,
+    text: string,
+    results: ParseResult[]
+  ): Array<{ start: number; end: number }> {
+    const pattern = new RegExp(PythonASTParser.DEF.source, 'g');
+    const spans: Array<{ start: number; end: number }> = [];
+    let match: RegExpExecArray | null;
+
+    while ((match = pattern.exec(text)) !== null) {
+      const openParen = match.index + match[0].length - 1;
+      const closeParen = this.matchingParen(text, openParen);
+      if (closeParen === -1) {
+        continue;
+      }
+
+      for (const param of this.splitTopLevel(text, openParen + 1, closeParen)) {
+        this.pushAnnotation(document, text, param.start, param.end, results);
+      }
+
+      const statementEnd = this.findTopLevel(
+        text,
+        closeParen + 1,
+        text.length,
+        (char) => char === ':'
+      );
+      this.pushReturnAnnotation(document, text, closeParen + 1, statementEnd, results);
+
+      spans.push({ start: openParen, end: statementEnd === -1 ? closeParen : statementEnd });
+      pattern.lastIndex = closeParen;
+    }
+
+    return spans;
+  }
+
+  /** Emits the `: type` span of a single parameter, if it has one. */
+  private pushAnnotation(
+    document: vscode.TextDocument,
+    text: string,
+    start: number,
+    end: number,
+    results: ParseResult[]
+  ): void {
+    const colon = this.findTopLevel(text, start, end, (char) => char === ':');
+    if (colon === -1) {
+      return;
+    }
+
+    const defaultAt = this.findTopLevel(
+      text,
+      colon + 1,
+      end,
+      (char, next) => char === '=' && next !== '='
+    );
+    const annotationEnd = this.trimEnd(text, colon + 1, defaultAt === -1 ? end : defaultAt);
+    if (annotationEnd <= colon + 1) {
+      return;
+    }
+
+    this.push(document, text, colon, annotationEnd, results);
+  }
+
+  private pushReturnAnnotation(
+    document: vscode.TextDocument,
+    text: string,
+    from: number,
+    statementEnd: number,
+    results: ParseResult[]
+  ): void {
+    if (statementEnd === -1) {
+      return;
+    }
+
+    const arrow = text.indexOf('->', from);
+    if (arrow === -1 || arrow > statementEnd) {
+      return;
+    }
+
+    const end = this.trimEnd(text, arrow + 2, statementEnd);
+    if (end > arrow + 2) {
+      this.push(document, text, arrow, end, results);
+    }
+  }
+
+  /**
+   * PEP 526 annotations on their own statement. Lines inside a signature are
+   * skipped: a wrapped parameter such as `    x: int,` looks exactly like a
+   * variable annotation, and the signature pass has already reported it.
+   */
+  private parseVariableAnnotations(
+    document: vscode.TextDocument,
+    text: string,
+    signatures: Array<{ start: number; end: number }>,
+    results: ParseResult[]
+  ): void {
     const lines = text.split('\n');
+    let offset = 0;
 
-    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-      const line = lines[lineNum];
-
-      // Parse parameter and variable type annotations
-      this.parseVariableAnnotations(line, lineNum, results);
-
-      // Parse return type annotations
-      this.parseReturnAnnotations(line, lineNum, results);
-    }
-
-    return results;
-  }
-
-  private parseVariableAnnotations(line: string, lineNum: number, results: ParseResult[]): void {
-    // Match variable annotations: name: type
-    // This handles: def foo(x: int, y: List[str]), var: str = "hello", etc.
-
-    let pos = 0;
-    while (pos < line.length) {
-      // Find colon that's not inside strings or brackets
-      const colonIndex = this.findNextColon(line, pos);
-      if (colonIndex === -1) break;
-
-      // Check if this is a type annotation (not dict key or slice)
-      if (this.isTypeAnnotation(line, colonIndex)) {
-        const typeInfo = this.extractTypeAnnotation(line, colonIndex);
-        if (typeInfo) {
-          results.push({
-            key: 'type',
-            value: typeInfo.type,
-            range: this.createRange(lineNum, typeInfo.start, typeInfo.end),
-            lineNumber: lineNum,
-          });
-          pos = typeInfo.end;
-        } else {
-          pos = colonIndex + 1;
-        }
-      } else {
-        pos = colonIndex + 1;
-      }
-    }
-  }
-
-  private parseReturnAnnotations(line: string, lineNum: number, results: ParseResult[]): void {
-    // Match return type annotations: -> Type
-    const arrowIndex = line.indexOf('->');
-    if (arrowIndex === -1) return;
-
-    // Make sure it's not in a string
-    if (this.isInsideString(line, arrowIndex)) return;
-
-    const typeInfo = this.extractReturnType(line, arrowIndex);
-    if (typeInfo) {
-      results.push({
-        key: 'type',
-        value: typeInfo.type,
-        range: this.createRange(lineNum, typeInfo.start, typeInfo.end),
-        lineNumber: lineNum,
-      });
-    }
-  }
-
-  private findNextColon(line: string, startPos: number): number {
-    let inString = false;
-    let stringChar = '';
-    let bracketDepth = 0;
-    let parenDepth = 0;
-
-    for (let i = startPos; i < line.length; i++) {
-      const char = line[i];
-      const prevChar = i > 0 ? line[i - 1] : '';
-
-      // Handle strings
-      if ((char === '"' || char === "'") && prevChar !== '\\') {
-        if (!inString) {
-          inString = true;
-          stringChar = char;
-        } else if (char === stringChar) {
-          inString = false;
+    for (const line of lines) {
+      const match = PythonASTParser.VARIABLE.exec(line);
+      const insideSignature = signatures.some((span) => offset >= span.start && offset <= span.end);
+      if (match && !insideSignature) {
+        const colon = offset + match[1].length + match[2].length + match[3].length - 1;
+        const end = offset + match[0].replace(/[ \t]*=?$/, '').length;
+        if (end > colon + 1) {
+          this.push(document, text, colon, end, results);
         }
       }
+      offset += line.length + 1;
+    }
+  }
 
-      if (inString) continue;
+  private push(
+    document: vscode.TextDocument,
+    text: string,
+    start: number,
+    end: number,
+    results: ParseResult[]
+  ): void {
+    const range = new vscode.Range(document.positionAt(start), document.positionAt(end));
+    if (range.start.line !== range.end.line) {
+      return;
+    }
+    results.push({ kind: 'type', key: '', value: text.slice(start, end), range });
+  }
 
-      // Track brackets
-      if (char === '[') bracketDepth++;
-      if (char === ']') bracketDepth--;
-      if (char === '(') parenDepth++;
-      if (char === ')') parenDepth--;
-
-      // Found a colon at the right depth
-      if (char === ':' && bracketDepth === 0 && parenDepth === 0) {
-        return i;
+  /** Index of the `)` matching the `(` at `openIndex`, or -1. */
+  private matchingParen(text: string, openIndex: number): number {
+    let depth = 0;
+    for (let i = openIndex; i < text.length; i++) {
+      const skip = this.skipString(text, i);
+      if (skip !== i) {
+        i = skip - 1;
+        continue;
+      }
+      const char = text[i];
+      if (char === '(' || char === '[' || char === '{') {
+        depth++;
+      } else if (char === ')' || char === ']' || char === '}') {
+        depth--;
+        if (depth === 0) {
+          return i;
+        }
       }
     }
-
     return -1;
   }
 
-  private isTypeAnnotation(line: string, colonIndex: number): boolean {
-    // Check context before colon
-    const before = line.substring(0, colonIndex).trim();
+  /** Splits `start..end` on top-level commas. */
+  private splitTopLevel(
+    text: string,
+    start: number,
+    end: number
+  ): Array<{ start: number; end: number }> {
+    const parts: Array<{ start: number; end: number }> = [];
+    let partStart = start;
+    let depth = 0;
 
-    // Not a type annotation if it's inside dict literal or lambda
-    if (before.endsWith('{')) return false;
-    if (before.includes('lambda')) return false;
-
-    // Check if there's a valid identifier before the colon
-    const identMatch = before.match(/([a-zA-Z_][a-zA-Z0-9_]*)\s*$/);
-    if (!identMatch) return false;
-
-    // Check what comes after the colon
-    const after = line.substring(colonIndex + 1).trim();
-    if (after.length === 0) return false;
-
-    // Should start with a type (uppercase or lowercase letter, or special types)
-    return /^[a-zA-Z_]/.test(after);
+    for (let i = start; i < end; i++) {
+      const skip = this.skipString(text, i);
+      if (skip !== i) {
+        i = skip - 1;
+        continue;
+      }
+      const char = text[i];
+      if ('([{'.includes(char)) {
+        depth++;
+      } else if (')]}'.includes(char)) {
+        depth--;
+      } else if (char === ',' && depth === 0) {
+        parts.push({ start: partStart, end: i });
+        partStart = i + 1;
+      }
+    }
+    if (partStart < end) {
+      parts.push({ start: partStart, end });
+    }
+    return parts.filter((part) => text.slice(part.start, part.end).trim().length > 0);
   }
 
-  private extractTypeAnnotation(line: string, colonIndex: number): { type: string; start: number; end: number } | null {
-    let typeEnd = colonIndex + 1;
-    let bracketDepth = 0;
-    let parenDepth = 0;
-    let inString = false;
-    let stringChar = '';
+  /** First index in `start..end` where `predicate` holds outside brackets and strings. */
+  private findTopLevel(
+    text: string,
+    start: number,
+    end: number,
+    predicate: (char: string, next: string) => boolean
+  ): number {
+    let depth = 0;
 
-    // Skip initial whitespace
-    while (typeEnd < line.length && /\s/.test(line[typeEnd])) {
-      typeEnd++;
-    }
-
-    const typeStart = typeEnd;
-
-    // Extract the type annotation
-    while (typeEnd < line.length) {
-      const char = line[typeEnd];
-      const prevChar = typeEnd > 0 ? line[typeEnd - 1] : '';
-
-      // Handle strings
-      if ((char === '"' || char === "'") && prevChar !== '\\') {
-        if (!inString) {
-          inString = true;
-          stringChar = char;
-        } else if (char === stringChar) {
-          inString = false;
-        }
+    for (let i = start; i < end; i++) {
+      const skip = this.skipString(text, i);
+      if (skip !== i) {
+        i = skip - 1;
+        continue;
       }
-
-      if (!inString) {
-        if (char === '[') bracketDepth++;
-        if (char === ']') bracketDepth--;
-        if (char === '(') parenDepth++;
-        if (char === ')') parenDepth--;
-
-        // End of type annotation
-        if (bracketDepth === 0 && parenDepth === 0) {
-          if (char === '=' || char === ',' || char === ')' || char === ']') {
-            break;
-          }
-        }
+      const char = text[i];
+      if ('([{'.includes(char)) {
+        depth++;
+      } else if (')]}'.includes(char)) {
+        depth--;
+      } else if (depth === 0 && predicate(char, text[i + 1] ?? '')) {
+        return i;
       }
-
-      typeEnd++;
     }
-
-    // Trim trailing whitespace
-    while (typeEnd > typeStart && /\s/.test(line[typeEnd - 1])) {
-      typeEnd--;
-    }
-
-    if (typeEnd <= typeStart) return null;
-
-    const type = line.substring(typeStart, typeEnd);
-
-    return {
-      type,
-      start: colonIndex,
-      end: typeEnd
-    };
+    return -1;
   }
 
-  private extractReturnType(line: string, arrowIndex: number): { type: string; start: number; end: number } | null {
-    let typeStart = arrowIndex + 2; // After '->'
-
-    // Skip whitespace
-    while (typeStart < line.length && /\s/.test(line[typeStart])) {
-      typeStart++;
+  /** If a string starts at `i`, the index just past it; otherwise `i`. */
+  private skipString(text: string, i: number): number {
+    const char = text[i];
+    if (char !== '"' && char !== "'") {
+      return i;
     }
+    const triple = text.startsWith(char.repeat(3), i);
+    const delimiter = triple ? char.repeat(3) : char;
 
-    let typeEnd = typeStart;
-    let bracketDepth = 0;
-    let parenDepth = 0;
-
-    // Extract until we hit a colon (function body start)
-    while (typeEnd < line.length) {
-      const char = line[typeEnd];
-
-      if (char === '[') bracketDepth++;
-      if (char === ']') bracketDepth--;
-      if (char === '(') parenDepth++;
-      if (char === ')') parenDepth--;
-
-      if (bracketDepth === 0 && parenDepth === 0 && char === ':') {
-        break;
+    for (let j = i + delimiter.length; j < text.length; j++) {
+      if (text[j] === '\\') {
+        j++;
+        continue;
       }
-
-      typeEnd++;
+      if (!triple && text[j] === '\n') {
+        return j;
+      }
+      if (text.startsWith(delimiter, j)) {
+        return j + delimiter.length;
+      }
     }
-
-    // Trim trailing whitespace
-    while (typeEnd > typeStart && /\s/.test(line[typeEnd - 1])) {
-      typeEnd--;
-    }
-
-    if (typeEnd <= typeStart) return null;
-
-    const type = line.substring(typeStart, typeEnd);
-
-    return {
-      type,
-      start: arrowIndex,
-      end: typeEnd
-    };
+    return text.length;
   }
 
-  private isInsideString(line: string, pos: number): boolean {
-    let inString = false;
-    let stringChar = '';
-
-    for (let i = 0; i < pos; i++) {
-      const char = line[i];
-      const prevChar = i > 0 ? line[i - 1] : '';
-
-      if ((char === '"' || char === "'") && prevChar !== '\\') {
-        if (!inString) {
-          inString = true;
-          stringChar = char;
-        } else if (char === stringChar) {
-          inString = false;
-        }
-      }
+  private trimEnd(text: string, start: number, end: number): number {
+    let trimmed = end;
+    while (trimmed > start && /\s/.test(text[trimmed - 1])) {
+      trimmed--;
     }
-
-    return inString;
+    return trimmed;
   }
 }

@@ -1,0 +1,37 @@
+# Sources and tooling: only the compiled output in out/ is needed at runtime.
+src/**
+test/**
+scripts/**
+.vscode/**
+out/**/*.map
+tsconfig.json
+tsconfig.test.json
+jest.config.js
+.eslintrc.json
+.prettierrc
+.gitignore
+package-lock.json
+coverage/**
+ARCHITECTURE.md
+
+# README screenshots. vsce rewrites relative image links to the repository's raw
+# URLs when packaging, so the marketplace page fetches these from GitHub and the
+# copies in the VSIX are never read -- they only cost 292 KB of download.
+assets/screenshots/**
+
+# The TypeScript AST parser needs `require('typescript')`, which resolves to
+# lib/typescript.js only. The compiler CLI, the language server and the bundled
+# lib.*.d.ts declarations are dead weight in the VSIX -- they would only be
+# needed by ts.createProgram, which this extension never calls.
+node_modules/typescript/bin/**
+node_modules/typescript/lib/_tsc.js
+node_modules/typescript/lib/_tsserver.js
+node_modules/typescript/lib/_typingsInstaller.js
+node_modules/typescript/lib/tsc.js
+node_modules/typescript/lib/tsserver.js
+node_modules/typescript/lib/tsserverlibrary.js
+node_modules/typescript/lib/typescriptServices.js
+node_modules/typescript/lib/typingsInstaller.js
+node_modules/typescript/lib/watchGuard.js
+node_modules/typescript/lib/*.d.ts
+node_modules/typescript/lib/*/diagnosticMessages.generated.json

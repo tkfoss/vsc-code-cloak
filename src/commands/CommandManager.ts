@@ -1,199 +1,172 @@
 import * as vscode from 'vscode';
-import { ConfigManager } from '../config/ConfigManager';
+import { CLOAK_STYLES, CloakFeature, CloakStyle, ConfigManager } from '../config/ConfigManager';
 import { DecorationManager } from '../decorations/DecorationManager';
 import { StatusBarManager } from '../ui/StatusBarManager';
 import { FoldingManager } from '../folding/FoldingManager';
 
-export class CommandManager {
-  private foldingManager: FoldingManager;
+const STYLES: readonly CloakStyle[] = CLOAK_STYLES;
 
+const FEATURE_NAMES: Record<CloakFeature, string> = {
+  secrets: 'Secrets',
+  types: 'Type annotations',
+  comments: 'Comments',
+  docstrings: 'Docstrings',
+};
+
+/**
+ * Registers every `codeCloak.*` command.
+ *
+ * Feedback goes to the status bar rather than notification toasts: this
+ * extension is used while a screen is being shared, where a stack of popups
+ * announcing what was just hidden defeats the point.
+ */
+export class CommandManager {
   constructor(
-    private configManager: ConfigManager,
-    private decorationManager: DecorationManager,
-    private statusBarManager: StatusBarManager
-  ) {
-    this.foldingManager = new FoldingManager(configManager);
-  }
+    private readonly configManager: ConfigManager,
+    private readonly decorationManager: DecorationManager,
+    private readonly statusBarManager: StatusBarManager,
+    private readonly foldingManager: FoldingManager
+  ) {}
 
   public registerCommands(context: vscode.ExtensionContext): void {
-    // Main toggle commands
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.enable', async () => await this.enableExtension())
-    );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.disable', async () => await this.disableExtension())
-    );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.toggle', async () => await this.toggleExtension())
-    );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.showQuickPick', async () => await this.showQuickPickMenu())
-    );
+    const commands: Record<string, () => Promise<void> | void> = {
+      'codeCloak.enable': () => this.setEnabled(true),
+      'codeCloak.disable': () => this.setEnabled(false),
+      'codeCloak.toggle': () => this.setEnabled(!this.configManager.isEnabled()),
+      'codeCloak.showQuickPick': () => this.showQuickPickMenu(),
+      'codeCloak.toggleSecrets': () => this.toggleFeature('secrets'),
+      'codeCloak.toggleTypes': () => this.toggleFeature('types'),
+      'codeCloak.toggleComments': () => this.toggleFeature('comments'),
+      'codeCloak.toggleDocstrings': () => this.toggleFeature('docstrings'),
+      'codeCloak.hideSecrets': () => this.setHidden('secrets', true),
+      'codeCloak.showSecrets': () => this.setHidden('secrets', false),
+      'codeCloak.hideTypes': () => this.setHidden('types', true),
+      'codeCloak.showTypes': () => this.setHidden('types', false),
+      'codeCloak.hideComments': () => this.setHidden('comments', true),
+      'codeCloak.showComments': () => this.setHidden('comments', false),
+      'codeCloak.hideDocstrings': () => this.setHidden('docstrings', true),
+      'codeCloak.showDocstrings': () => this.setHidden('docstrings', false),
+      'codeCloak.toggleFolding': () => this.setFolding(!this.configManager.isFoldingEnabled()),
+      'codeCloak.foldCloaked': () => this.foldCloaked(),
+      'codeCloak.unfoldCloaked': () => this.unfoldCloaked(),
+      'codeCloak.toggleCurrentLine': () => this.toggleCurrentLine(),
+      'codeCloak.addToExcludeList': () => this.addToExcludeList(),
+      'codeCloak.excludeFile': () => this.excludeFile(),
+      'codeCloak.includeFile': () => this.includeFile(),
+      'codeCloak.changeStyle': () => this.changeStyle(),
+    };
 
-    // Feature-specific commands
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.hideSecrets', () => this.hideSecrets())
-    );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.showSecrets', () => this.showSecrets())
-    );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.hideTypes', () => this.hideTypes())
-    );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.showTypes', () => this.showTypes())
-    );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.hideComments', async () => await this.hideComments())
-    );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.showComments', async () => await this.showComments())
-    );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.hideDocstrings', async () => await this.hideDocstrings())
-    );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.showDocstrings', async () => await this.showDocstrings())
-    );
-
-    // File and selection commands
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.toggleCurrentLine', () =>
-        this.toggleCurrentLine()
-      )
-    );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.addToExcludeList', () =>
-        this.addToExcludeList()
-      )
-    );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.excludeFile', () => this.excludeFile())
-    );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.includeFile', () => this.includeFile())
-    );
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codeCloak.changeStyle', () => this.changeStyle())
-    );
+    for (const [id, handler] of Object.entries(commands)) {
+      context.subscriptions.push(vscode.commands.registerCommand(id, handler));
+    }
   }
 
-  private async enableExtension(): Promise<void> {
-    await this.configManager.setEnabled(true);
-    this.decorationManager.refreshAllDecorations();
-    this.statusBarManager.update();
+  private async setEnabled(enabled: boolean): Promise<void> {
+    await this.configManager.setEnabled(enabled);
+    this.decorationManager.clearRevealedLines();
+    await this.refresh({ unfold: !enabled });
+    this.report(`Code Cloak ${enabled ? 'enabled' : 'disabled'}`);
+  }
 
-    // Auto-fold if configured
-    const editor = vscode.window.activeTextEditor;
-    if (editor && this.configManager.getConfig().autoHide) {
-      await this.foldingManager.foldAll(editor);
+  private toggleFeature(feature: CloakFeature): Promise<void> {
+    return this.setHidden(feature, !this.configManager.isHidden(feature));
+  }
+
+  private async setHidden(feature: CloakFeature, hidden: boolean): Promise<void> {
+    if (!this.configManager.isFeatureEnabled(feature)) {
+      vscode.window.showWarningMessage(
+        `${FEATURE_NAMES[feature]} hiding is turned off. Enable "codeCloak.features.${feature}" first.`
+      );
+      return;
     }
 
-    vscode.window.showInformationMessage('Code Cloak enabled');
+    this.configManager.setHidden(feature, hidden);
+    if (hidden) {
+      this.decorationManager.clearRevealedLines();
+    }
+    // Revealing has to unfold first: folds are collapsed regions, and only a
+    // fresh unfold-then-fold pass leaves the still-hidden features collapsed.
+    await this.refresh({ unfold: !hidden });
+    this.report(`${FEATURE_NAMES[feature]} ${hidden ? 'hidden' : 'revealed'}`);
   }
 
-  private async disableExtension(): Promise<void> {
-    await this.configManager.setEnabled(false);
-    this.decorationManager.refreshAllDecorations();
-    this.statusBarManager.update();
-
-    // Unfold everything when disabling
+  /**
+   * Turning folding off reopens what the cloak folded before the setting is
+   * written, so the manager still knows which regions were its own to reopen.
+   */
+  private async setFolding(enabled: boolean): Promise<void> {
     const editor = vscode.window.activeTextEditor;
-    if (editor) {
+    if (!enabled && editor) {
       await this.foldingManager.unfoldAll(editor);
     }
 
-    vscode.window.showInformationMessage('Code Cloak disabled');
+    await this.configManager.setFoldingEnabled(enabled);
+    await this.refresh();
+    this.report(`Folding ${enabled ? 'on' : 'off'}`);
   }
 
-  private async toggleExtension(): Promise<void> {
-    const enabled = !this.configManager.isEnabled();
-    await this.configManager.setEnabled(enabled);
-    this.decorationManager.refreshAllDecorations();
-    this.statusBarManager.update();
-
+  private async foldCloaked(): Promise<void> {
     const editor = vscode.window.activeTextEditor;
-    if (editor) {
-      if (enabled && this.configManager.getConfig().autoHide) {
-        await this.foldingManager.foldAll(editor);
-      } else if (!enabled) {
-        await this.foldingManager.unfoldAll(editor);
+    if (!editor) {
+      return;
+    }
+
+    if (!this.configManager.isFoldingEnabled()) {
+      vscode.window.showWarningMessage(
+        'Code Cloak folding is turned off. Enable "codeCloak.folding.enabled" first.'
+      );
+      return;
+    }
+
+    await this.foldingManager.foldAll(editor);
+    this.report('Cloaked regions folded');
+  }
+
+  private async unfoldCloaked(): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      return;
+    }
+    await this.foldingManager.unfoldAll(editor);
+    this.report('Cloaked regions unfolded');
+  }
+
+  private toggleCurrentLine(): void {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      return;
+    }
+
+    const lines = new Set<number>();
+    for (const selection of editor.selections) {
+      for (let line = selection.start.line; line <= selection.end.line; line++) {
+        lines.add(line);
       }
     }
 
-    vscode.window.showInformationMessage(`Code Cloak ${enabled ? 'enabled' : 'disabled'}`);
-  }
-
-  private hideSecrets(): void {
-    this.configManager.setSecretsHidden(true);
-    this.refreshDecorations();
-    vscode.window.showInformationMessage('Secrets hidden');
-  }
-
-  private showSecrets(): void {
-    this.configManager.setSecretsHidden(false);
-    this.refreshDecorations();
-    vscode.window.showInformationMessage('Secrets revealed');
-  }
-
-  private hideTypes(): void {
-    this.configManager.setTypesHidden(true);
-    this.refreshDecorations();
-    vscode.window.showInformationMessage('Type annotations hidden');
-  }
-
-  private showTypes(): void {
-    this.configManager.setTypesHidden(false);
-    this.refreshDecorations();
-    vscode.window.showInformationMessage('Type annotations revealed');
-  }
-
-  private async hideComments(): Promise<void> {
-    this.configManager.setCommentsHidden(true);
-    this.refreshDecorations();
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-      await this.foldingManager.foldAll(editor);
-    }
-    vscode.window.showInformationMessage('Comments hidden');
-  }
-
-  private async showComments(): Promise<void> {
-    this.configManager.setCommentsHidden(false);
-    this.refreshDecorations();
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-      await this.foldingManager.unfoldAll(editor);
-    }
-    vscode.window.showInformationMessage('Comments revealed');
-  }
-
-  private async hideDocstrings(): Promise<void> {
-    this.configManager.setDocstringsHidden(true);
-    this.refreshDecorations();
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-      await this.foldingManager.foldAll(editor);
-    }
-    vscode.window.showInformationMessage('Docstrings hidden');
-  }
-
-  private async showDocstrings(): Promise<void> {
-    this.configManager.setDocstringsHidden(false);
-    this.refreshDecorations();
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-      await this.foldingManager.unfoldAll(editor);
-    }
-    vscode.window.showInformationMessage('Docstrings revealed');
-  }
-
-  private async toggleCurrentLine(): Promise<void> {
-    vscode.window.showInformationMessage('Toggle current line - Coming soon!');
+    this.decorationManager.toggleLines(editor, [...lines]);
   }
 
   private async addToExcludeList(): Promise<void> {
-    vscode.window.showInformationMessage('Add to exclude list - Coming soon!');
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      return;
+    }
+
+    const selected = editor.document.getText(editor.selection).trim();
+    const key =
+      selected || this.decorationManager.secretKeyAt(editor.document, editor.selection.active);
+
+    if (!key) {
+      vscode.window.showWarningMessage(
+        'No key found on this line. Select the key name to exclude it.'
+      );
+      return;
+    }
+
+    await this.configManager.addExcludedKey(key);
+    await this.refresh();
+    this.report(`"${key}" will no longer be hidden`);
   }
 
   private async excludeFile(): Promise<void> {
@@ -201,11 +174,9 @@ export class CommandManager {
     if (!editor) {
       return;
     }
-
-    const filePath = editor.document.fileName;
-    await this.configManager.excludeFile(filePath);
-    this.decorationManager.refreshAllDecorations();
-    vscode.window.showInformationMessage(`File excluded: ${filePath}`);
+    await this.configManager.excludeFile(editor.document.fileName);
+    await this.refresh({ unfold: true });
+    this.report('File excluded from Code Cloak');
   }
 
   private async includeFile(): Promise<void> {
@@ -213,99 +184,93 @@ export class CommandManager {
     if (!editor) {
       return;
     }
-
-    const filePath = editor.document.fileName;
-    await this.configManager.includeFile(filePath);
-    this.decorationManager.refreshAllDecorations();
-    vscode.window.showInformationMessage(`File included: ${filePath}`);
+    await this.configManager.includeFile(editor.document.fileName);
+    await this.refresh();
+    this.report('File included in Code Cloak');
   }
 
   private async changeStyle(): Promise<void> {
-    const styles = ['text', 'dots', 'stars', 'scramble', 'blur', 'block'];
-    const selected = await vscode.window.showQuickPick(styles, {
-      placeHolder: 'Select hiding style',
-    });
+    const current = this.configManager.getConfig().appearance.style;
+    const selected = await vscode.window.showQuickPick(
+      STYLES.map((style) => ({
+        label: style,
+        description: style === current ? 'current' : undefined,
+      })),
+      { placeHolder: 'Select hiding style' }
+    );
 
     if (selected) {
-      await vscode.workspace
-        .getConfiguration('codeCloak')
-        .update('appearance.style', selected, vscode.ConfigurationTarget.Global);
-      this.configManager.reloadConfig();
-      this.decorationManager.refreshAllDecorations();
-      vscode.window.showInformationMessage(`Hiding style changed to: ${selected}`);
-    }
-  }
-
-  private refreshDecorations(): void {
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-      this.decorationManager.updateDecorations(editor);
+      await this.configManager.setStyle(selected.label as CloakStyle);
+      await this.refresh();
+      this.report(`Hiding style: ${selected.label}`);
     }
   }
 
   private async showQuickPickMenu(): Promise<void> {
-    const enabled = this.configManager.isEnabled();
-    const secretsHidden = this.configManager.isSecretsHidden();
-    const typesHidden = this.configManager.isTypesHidden();
-    const commentsHidden = this.configManager.isCommentsHidden();
-    const docstringsHidden = this.configManager.isDocstringsHidden();
-
-    interface QuickPickItemWithAction extends vscode.QuickPickItem {
-      action: () => Promise<void>;
+    interface ActionItem extends vscode.QuickPickItem {
+      action?: () => Promise<void> | void;
     }
 
-    const items: QuickPickItemWithAction[] = [
+    const enabled = this.configManager.isEnabled();
+    const folding = this.configManager.isFoldingEnabled();
+    const separator: ActionItem = { label: '', kind: vscode.QuickPickItemKind.Separator };
+
+    const items: ActionItem[] = [
       {
         label: `$(${enabled ? 'eye' : 'eye-closed'}) ${enabled ? 'Disable' : 'Enable'} Code Cloak`,
         description: enabled ? 'Turn off all cloaking' : 'Turn on cloaking',
-        action: async () => enabled ? await this.disableExtension() : await this.enableExtension()
+        action: () => this.setEnabled(!enabled),
       },
+      separator,
+      ...(Object.keys(FEATURE_NAMES) as CloakFeature[]).map((feature) => {
+        const hidden = this.configManager.isHidden(feature);
+        const available = this.configManager.isFeatureEnabled(feature);
+        return {
+          label: `$(${hidden ? 'eye' : 'eye-closed'}) ${hidden ? 'Show' : 'Hide'} ${FEATURE_NAMES[feature]}`,
+          description: available ? undefined : 'feature disabled in settings',
+          action: () => this.setHidden(feature, !hidden),
+        };
+      }),
+      separator,
       {
-        label: '',
-        description: '',
-        kind: vscode.QuickPickItemKind.Separator,
-        action: async () => {}
-      },
-      {
-        label: `$(${secretsHidden ? 'eye' : 'eye-closed'}) ${secretsHidden ? 'Show' : 'Hide'} Secrets`,
-        description: secretsHidden ? 'Reveal API keys and tokens' : 'Hide API keys and tokens',
-        action: async () => secretsHidden ? this.showSecrets() : this.hideSecrets()
-      },
-      {
-        label: `$(${typesHidden ? 'eye' : 'eye-closed'}) ${typesHidden ? 'Show' : 'Hide'} Type Annotations`,
-        description: secretsHidden ? 'Reveal type hints' : 'Hide type hints',
-        action: async () => typesHidden ? this.showTypes() : this.hideTypes()
-      },
-      {
-        label: `$(${commentsHidden ? 'eye' : 'eye-closed'}) ${commentsHidden ? 'Show' : 'Hide'} Comments`,
-        description: commentsHidden ? 'Reveal comments' : 'Hide comments',
-        action: async () => commentsHidden ? await this.showComments() : await this.hideComments()
-      },
-      {
-        label: `$(${docstringsHidden ? 'eye' : 'eye-closed'}) ${docstringsHidden ? 'Show' : 'Hide'} Docstrings`,
-        description: docstringsHidden ? 'Reveal docstrings' : 'Hide docstrings',
-        action: async () => docstringsHidden ? await this.showDocstrings() : await this.hideDocstrings()
-      },
-      {
-        label: '',
-        description: '',
-        kind: vscode.QuickPickItemKind.Separator,
-        action: async () => {}
+        label: `$(fold${folding ? '-up' : '-down'}) Turn Folding ${folding ? 'Off' : 'On'}`,
+        description: folding
+          ? 'stop collapsing cloaked comments and docstrings'
+          : 'collapse cloaked comments and docstrings',
+        action: () => this.setFolding(!folding),
       },
       {
         label: '$(paintcan) Change Style',
-        description: 'Change the cloaking visual style',
-        action: async () => await this.changeStyle()
-      }
+        description: `currently: ${this.configManager.getConfig().appearance.style}`,
+        action: () => this.changeStyle(),
+      },
     ];
 
     const selected = await vscode.window.showQuickPick(items, {
-      placeHolder: 'Code Cloak Settings',
-      matchOnDescription: true
+      placeHolder: 'Code Cloak',
+      matchOnDescription: true,
     });
+    await selected?.action?.();
+  }
 
-    if (selected) {
-      await selected.action();
+  /** Re-renders decorations, folds and the status bar after any state change. */
+  private async refresh(options: { unfold?: boolean } = {}): Promise<void> {
+    this.decorationManager.refreshAllDecorations();
+    this.statusBarManager.update();
+
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      return;
     }
+    if (options.unfold) {
+      await this.foldingManager.unfoldAll(editor);
+    }
+    if (this.configManager.isEnabled()) {
+      await this.foldingManager.foldAll(editor);
+    }
+  }
+
+  private report(message: string): void {
+    vscode.window.setStatusBarMessage(`$(eye-closed) ${message}`, 3000);
   }
 }

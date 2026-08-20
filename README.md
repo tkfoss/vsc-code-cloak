@@ -1,285 +1,118 @@
 # VSC Code Cloak
 
-**Universal code privacy extension for Visual Studio Code**
-
-Hide secrets, type annotations, comments, docstrings and more during screen sharing, streaming, or recording.
-
-## Features
-
-VSC Code Cloak is a comprehensive privacy extension that combines the best features from multiple code hiding extensions:
-
-### Multi-Feature Support
-
-- **Secrets Hiding**: Hide sensitive values in configuration files (.env, .json, .yaml, .properties, .toml, .sh)
-- **Type Annotations**: Hide TypeScript/Python type annotations for cleaner presentations
-- **Comments**: Hide single-line and block comments
-- **Docstrings**: Hide Python docstrings
-
-### Multiple Hiding Styles
-
-Choose from various hiding styles to match your preference:
-
-- **Text**: Replace with custom text (e.g., `***HIDDEN***`)
-- **Dots**: Replace with dots (`••••••••••••`)
-- **Stars**: Replace with asterisks (`************`)
-- **Scramble**: Randomly shuffle characters
-- **Blur**: Apply blur effect to content
-- **Block**: Solid block covering content
-
-### Smart Pattern Matching
-
-- Configurable key patterns for secret detection
-- Wildcard support (`*KEY*`, `*TOKEN*`, `*PASSWORD*`)
-- Exclude list for public values
-- File exclusion support
-
-### User-Friendly Interface
-
-- Status bar indicator showing active features
-- Quick toggle via keyboard shortcuts
-- Context menu integration
-- Hover preview (optional)
-
-## Installation
-
-1. Open VS Code
-2. Press `Ctrl+P` / `Cmd+P`
-3. Type `ext install vsc-code-cloak`
-4. Press Enter
-
-## Quick Start
-
-1. Open a file with secrets (e.g., `.env`, `.json`)
-2. Use `Ctrl+Shift+Alt+H` / `Cmd+Shift+Alt+H` to toggle Code Cloak
-3. Use `Ctrl+Shift+Alt+S` / `Cmd+Shift+Alt+S` to hide/show secrets
-
-## Keyboard Shortcuts
-
-| Command | Windows/Linux | macOS | Description |
-|---------|--------------|-------|-------------|
-| Toggle Extension | `Ctrl+Shift+Alt+H` | `Cmd+Shift+Alt+H` | Enable/disable Code Cloak |
-| Toggle Secrets | `Ctrl+Shift+Alt+S` | `Cmd+Shift+Alt+S` | Hide/show secrets |
-| Toggle Types | `Ctrl+Shift+Alt+T` | `Cmd+Shift+Alt+T` | Hide/show type annotations |
-| Toggle Comments | `Ctrl+Shift+Alt+C` | `Cmd+Shift+Alt+C` | Hide/show comments |
-| Toggle Docstrings | `Ctrl+Shift+Alt+D` | `Cmd+Shift+Alt+D` | Hide/show docstrings |
-| Toggle Current Line | `Ctrl+Shift+Alt+L` | `Cmd+Shift+Alt+L` | Toggle current line visibility |
-
-## Configuration
-
-Access settings via: `Preferences: Open Settings (UI)` → Search for "Code Cloak"
-
-### Main Settings
-
-```json
-{
-  "codeCloak.enabled": true,
-  "codeCloak.autoHide": true,
-  "codeCloak.features.secrets": true,
-  "codeCloak.features.types": false,
-  "codeCloak.features.comments": false,
-  "codeCloak.features.docstrings": false
-}
-```
-
-### Secret Patterns
-
-```json
-{
-  "codeCloak.secrets.keyPatterns": [
-    "*KEY*",
-    "*TOKEN*",
-    "*SECRET*",
-    "*PASSWORD*",
-    "*API*",
-    "*DB*",
-    "*CREDENTIAL*",
-    "*AUTH*",
-    "*PRIVATE*"
-  ],
-  "codeCloak.secrets.excludeKeys": [
-    "PUBLIC*",
-    "*_TEST",
-    "DEBUG",
-    "NODE_ENV"
-  ]
-}
-```
-
-### Appearance
-
-```json
-{
-  "codeCloak.appearance.style": "text",
-  "codeCloak.appearance.hiddenText": "***HIDDEN***",
-  "codeCloak.appearance.textColor": "auto",
-  "codeCloak.appearance.backgroundColor": "auto",
-  "codeCloak.appearance.opacity": 0.3
-}
-```
-
-## Supported File Types
-
-### Secrets Detection
-
-- Environment files: `.env`, `.env.*`, `.envrc`
-- JSON: `.json`, `.jsonc`
-- YAML: `.yaml`, `.yml`
-- Properties: `.properties`, `.ini`, `.conf`
-- TOML: `.toml`
-- Shell scripts: `.sh`
-
-### Type Annotations
-
-- TypeScript: `.ts`, `.tsx`
-- Python: `.py`
-
-### Docstrings
-
-- Python: `.py`
-- Jupyter: `.ipynb`
-
-## Examples
-
-### Environment Files
-
-```env
-# Before hiding
-API_KEY=sk-1234567890abcdef
-DATABASE_URL=postgresql://user:pass@localhost:5432/db
-
-# After hiding
-API_KEY=***HIDDEN***
-DATABASE_URL=***HIDDEN***
-```
-
-### TypeScript
-
-```typescript
-// Before hiding (types visible)
-function greet(name: string): string {
-  return `Hello, ${name}`;
-}
-
-// After hiding (types hidden)
-function greet(name) {
-  return `Hello, ${name}`;
-}
-```
-
-### Python Docstrings
-
-```python
-# Before hiding
-def calculate(x, y):
-    """
-    Calculate the sum of two numbers.
-
-    Args:
-        x: First number
-        y: Second number
-
-    Returns:
-        Sum of x and y
-    """
-    return x + y
-
-# After hiding (docstring hidden)
-def calculate(x, y):
-    return x + y
-```
-
-## Use Cases
-
-Perfect for:
-
-- Live coding presentations
-- Streaming on Twitch/YouTube
-- Recording screencasts
-- Teaching and tutorials
-- Code reviews with sensitive data
-- Sharing screenshots
-
-## Privacy & Security
-
-**Important**: Code Cloak only hides content visually in the editor. It does NOT:
-
-- Modify your actual files
-- Store any sensitive information
-- Encrypt or secure your data
-- Prevent copying or accessing the original values
-
-Always review what you're sharing and use proper security practices.
-
-## Commands
-
-Access via Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
-
-- `Code Cloak: Enable`
-- `Code Cloak: Disable`
-- `Code Cloak: Toggle`
-- `Code Cloak: Hide Secrets`
-- `Code Cloak: Show Secrets`
-- `Code Cloak: Hide Type Annotations`
-- `Code Cloak: Show Type Annotations`
-- `Code Cloak: Hide Comments`
-- `Code Cloak: Show Comments`
-- `Code Cloak: Hide Docstrings`
-- `Code Cloak: Show Docstrings`
-- `Code Cloak: Change Hiding Style`
-- `Code Cloak: Exclude This File`
-- `Code Cloak: Include This File`
-
-## Context Menu
-
-Right-click in any supported file to access Code Cloak options:
-
-```
-Code Cloak
-├── Enable/Disable
-├── Hide/Show Secrets
-├── Hide/Show Types
-├── Hide/Show Comments
-├── Hide/Show Docstrings
-├── Toggle Current Line
-├── Add to Exclude List
-├── Exclude/Include This File
-└── Change Style
-```
-
-## Requirements
-
-- VS Code 1.96.0 or higher
-- Node.js 18.0.0 or higher (for development)
-
-## Known Limitations
-
-- There is a brief delay when opening files before content is hidden
-- Very large files may experience performance issues
-- Some complex syntax may not be parsed correctly
-- Decorations may flicker when switching between files
-
-## Contributing
-
-Contributions are welcome! Please see the repository for contribution guidelines.
-
-## Credits
-
-Inspired by and built upon concepts from:
-
-- [Camouflage](https://marketplace.visualstudio.com/items?itemName=zeybek.camouflage) by Ahmet Zeybek
-- [Cloak](https://marketplace.visualstudio.com/items?itemName=johnpapa.vscode-cloak) by John Papa
-- [Censitive](https://marketplace.visualstudio.com/items?itemName=1nVitr0.censitive) by 1nVitr0
-- [Toggle Docstrings](https://marketplace.visualstudio.com/items?itemName=GrayRigel.toggle-docstrings)
-
-## License
-
-MIT License - See LICENSE file for details
-
-## Support
-
-- Report issues: [GitHub Issues](https://github.com/vsc-code-cloak/vsc-code-cloak/issues)
-- Feature requests: [GitHub Discussions](https://github.com/vsc-code-cloak/vsc-code-cloak/discussions)
-
----
-
-**Enjoy your privacy with VSC Code Cloak!**
+Hides secrets, type annotations, comments and docstrings in the editor while you
+share your screen. The terminal, diffs, IntelliSense, other
+extensions and the clipboard still see the real values; copy/paste copies the
+original text. `ext install tkfoss.vsc-code-cloak`. Requires VS Code 1.96.0 or later.
+
+![Python source before and after cloaking](assets/screenshots/masking-and-folding.jpg)
+
+## Commands and keys
+
+Prefixed `Code Cloak:` in the palette. `Ctrl` is `Cmd` on macOS.
+
+| Command | ID | Key |
+|---|---|---|
+| Show Menu | `codeCloak.showQuickPick` | |
+| Enable / Disable / Toggle | `codeCloak.enable`, `.disable`, `.toggle` | `Ctrl+Shift+Alt+H` |
+| Toggle / Hide / Show Secrets | `codeCloak.toggleSecrets`, `.hideSecrets`, `.showSecrets` | `Ctrl+Shift+Alt+S` |
+| … Type Annotations | `codeCloak.toggleTypes`, `.hideTypes`, `.showTypes` | `Ctrl+Shift+Alt+T` |
+| … Comments | `codeCloak.toggleComments`, `.hideComments`, `.showComments` | `Ctrl+Shift+Alt+C` |
+| … Docstrings | `codeCloak.toggleDocstrings`, `.hideDocstrings`, `.showDocstrings` | `Ctrl+Shift+Alt+D` |
+| Toggle Folding | `codeCloak.toggleFolding` | `Ctrl+Shift+Alt+F` |
+| Fold / Unfold Cloaked Regions | `codeCloak.foldCloaked`, `.unfoldCloaked` | |
+| Toggle Current Line | `codeCloak.toggleCurrentLine` | `Ctrl+Shift+Alt+L` |
+| Add to Exclude List | `codeCloak.addToExcludeList` | |
+| Exclude / Include This File | `codeCloak.excludeFile`, `.includeFile` | |
+| Change Hiding Style | `codeCloak.changeStyle` | |
+
+
+## Hiding styles
+
+![The same .env rendered in four hiding styles](assets/screenshots/hiding-styles.jpg)
+
+The same `.env` uncloaked, then `blur`, `stars` and `block`.
+
+| Style | Rendering | Reveals length? |
+|---|---|---|
+| `text` | `appearance.hiddenText` everywhere | No |
+| `compact` | `compactText` inline, `hiddenText` on a whole line | No |
+| `dots` / `stars` | One `•` / `*` per character, capped at 20 | Yes, up to 20 |
+| `scramble` | The same characters shuffled, deterministic per value | Yes, and the character set |
+| `blur` / `block` | Blurred, or painted out, in place | Yes |
+
+
+## Settings
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `codeCloak.enabled` | `true` | Master switch |
+| `codeCloak.autoHide` | `true` | Start each session with enabled features hidden |
+| `codeCloak.features.secrets` | `true` | Participate in cloaking |
+| `codeCloak.features.types` / `.comments` / `.docstrings` | `false` | |
+| `codeCloak.secrets.filePatterns` | see below | File names scanned for secrets |
+| `codeCloak.secrets.keyPatterns` | `*KEY*`, `*TOKEN*`, `*SECRET*`, … | Keys whose values are hidden |
+| `codeCloak.secrets.excludeKeys` | `PUBLIC*`, `*_TEST`, `DEBUG`, … | Keys never hidden; takes precedence |
+| `codeCloak.appearance.style` | `compact` | `text`, `compact`, `dots`, `stars`, `scramble`, `blur`, `block` |
+| `codeCloak.appearance.hiddenText` | `***HIDDEN***` | Marker for `text`, and for whole-line masks under `compact` |
+| `codeCloak.appearance.compactText` | `•` | Inline glyph for `compact`; `""` draws nothing |
+| `codeCloak.appearance.textColor` / `.backgroundColor` | `auto` | Replacement text colour; covering colour for `block` |
+| `codeCloak.appearance.opacity` | `0.3` | Opacity for `blur` |
+| `codeCloak.types.languages` | `typescript`, `typescriptreact`, `python` | Languages where types are hidden |
+| `codeCloak.comments.hideLineComments` / `.hideBlockComments` | `true` | Mask `//`, `#`, `--` / `/* … */` |
+| `codeCloak.docstrings.languages` | `python`, `jupyter` | Languages where docstrings are hidden |
+| `codeCloak.folding.enabled` | `true` | Collapse cloaked regions as well as masking them |
+| `codeCloak.folding.inline` / `.trimBlankLines` | `true` | Collapse runs of whole-line comments; extend folds over blank lines beneath |
+| `codeCloak.folding.minimumLines` | `2` | Fewest lines a region must span before it folds |
+| `codeCloak.files.excluded` | `[]` | Paths never cloaked: exact path, directory, or glob |
+| `codeCloak.hover.showPreview` / `.message` | `false` | Reveal the original value on hover; hover heading |
+
+Settings are written to the scope where they are already defined (workspace
+folder, workspace, then user); `files.excluded` entries inside a workspace are
+stored relative to it, in workspace scope. Patterns are shell-style wildcards,
+case-insensitive against the whole string: `*` any run, `?` one character, all
+else literal — `*.json` does not match `package.jsonc`. `filePatterns` matches
+the file name only; `files.excluded` the full path and the file name.
+
+## Supported formats
+
+Secrets are scanned when the file name matches `secrets.filePatterns` **and**
+the key matches `secrets.keyPatterns`. Quoted values are cloaked inside the
+quotes, so a string stays distinguishable from a bare token.
+
+| Files | Syntax recognised |
+|---|---|
+| `.env`, `.env.*`, `*.env`, `.envrc`, `*.sh` | `KEY=value`, `export KEY=value`, quoted values, trailing `#` comments |
+| `*.json`, `*.jsonc` | `"key": value` at any depth, including comments and files not yet valid JSON |
+| `*.yaml`, `*.yml` | `key: value`, list items, block scalars (`key: \|`) line by line |
+| `*.properties`, `*.ini`, `*.conf`, `*.cfg`, `*.toml` | `key = value`, `key: value`; sections and `;`/`#` comments skipped |
+
+Type annotations: TypeScript and TSX parameter, variable, property, interface
+member and return annotations from the compiler's AST; Python parameter, return
+and PEP 526 variable annotations. Each is hidden with its leading `:` or `->`,
+so what is left reads as valid untyped code. Comments are per language — `//`
+and `/* */` for C-family, `#` for Python, shell and YAML, `--` for SQL and Lua,
+`<!-- -->` for markup; delimiters inside string literals are not comments.
+Docstrings are Python triple-quoted strings that begin a line, including module
+and class docstrings.
+
+## Limitations
+
+- Re-parsed 120 ms after the last keystroke, so a value is briefly visible while
+  typed. Parses are cached per document version; the first after an edit is not
+  free on large files.
+- Multi-line type annotations are not hidden.
+- A single-line construct on its own row cannot be folded away — VS Code folding
+  needs two lines — so it keeps the `hiddenText` marker instead.
+- `Unfold All` reveals folded regions, but the masking underneath stays.
+
+## Development
+
+`npm install`, then `npm run compile` (tsc → `out/`), `npm run watch`, `npm test`,
+`npm run check` (lint + typecheck + tests), `npm run package` (vsce → `.vsix`),
+`npm run icon`. `F5` launches an Extension Development Host. Internal design:
+[ARCHITECTURE.md](ARCHITECTURE.md). MIT — see [LICENSE](LICENSE). Inspired by
+[Camouflage](https://marketplace.visualstudio.com/items?itemName=zeybek.camouflage),
+[Cloak](https://marketplace.visualstudio.com/items?itemName=johnpapa.vscode-cloak),
+[Censitive](https://marketplace.visualstudio.com/items?itemName=1nVitr0.censitive) and
+[Toggle Docstrings](https://marketplace.visualstudio.com/items?itemName=GrayRigel.toggle-docstrings).
