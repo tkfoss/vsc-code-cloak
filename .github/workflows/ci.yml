@@ -1,0 +1,78 @@
+name: CI
+
+# Every push / PR: lint, typecheck, test, package the .vsix (downloadable as a
+# workflow artifact).
+#
+# Push to main with a package.json version that has no tag yet: additionally
+# create tag vX.Y.Z + a GitHub Release with the .vsix attached, and publish to
+# the stores whose token secret is set (VSCE_PAT -> VS Code Marketplace,
+# OVSX_PAT -> Open VSX). See "Releasing" in README.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run check
+
+      - name: Package
+        id: package
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          VSIX="vsc-code-cloak-$VERSION.vsix"
+          npx vsce package --out "$VSIX"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "vsix=$VSIX" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: ${{ steps.package.outputs.vsix }}
+          if-no-files-found: error
+
+      - name: Check if this version is already released
+        id: check
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v${{ steps.package.outputs.version }}" >/dev/null; then
+            echo "v${{ steps.package.outputs.version }} already released; skipping."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.release == 'true'
+        run: |
+          gh release create "v${{ steps.package.outputs.version }}" "${{ steps.package.outputs.vsix }}" \
+            --target "$GITHUB_SHA" \
+            --title "v${{ steps.package.outputs.version }}" \
+            --generate-notes
+
+      - name: Publish to VS Code Marketplace
+        if: steps.check.outputs.release == 'true' && env.VSCE_PAT != ''
+        run: npx vsce publish --packagePath "${{ steps.package.outputs.vsix }}"
+
+      - name: Publish to Open VSX
+        if: steps.check.outputs.release == 'true' && env.OVSX_PAT != ''
+        run: npx --yes ovsx publish "${{ steps.package.outputs.vsix }}" -p "$OVSX_PAT"

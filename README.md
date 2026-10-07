@@ -5,6 +5,11 @@ share your screen. The terminal, diffs, IntelliSense, other
 extensions and the clipboard still see the real values; copy/paste copies the
 original text. `ext install tkfoss.vsc-code-cloak`. Requires VS Code 1.96.0 or later.
 
+To install manually, download the `.vsix` from the
+[latest release](https://github.com/tkfoss/vsc-code-cloak/releases/latest) and run
+`code --install-extension vsc-code-cloak-<version>.vsix` (or *Extensions → … →
+Install from VSIX…*).
+
 ![Python source before and after cloaking](assets/screenshots/masking-and-folding.jpg)
 
 ## Commands and keys
@@ -116,3 +121,11 @@ and class docstrings.
 [Cloak](https://marketplace.visualstudio.com/items?itemName=johnpapa.vscode-cloak),
 [Censitive](https://marketplace.visualstudio.com/items?itemName=1nVitr0.censitive) and
 [Toggle Docstrings](https://marketplace.visualstudio.com/items?itemName=GrayRigel.toggle-docstrings).
+
+## Releasing
+
+Bump `version` in `package.json` (and `CHANGELOG.md`), commit, push to `main`.
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) tests, tags `vX.Y.Z`,
+creates a GitHub Release with the `.vsix`, and publishes to the VS Code
+Marketplace / Open VSX if the `VSCE_PAT` / `OVSX_PAT` repo secrets are set.
+Pushes that don't change the version only run the tests.
